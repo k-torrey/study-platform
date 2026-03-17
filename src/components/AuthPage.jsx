@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../auth';
 
 export default function AuthPage() {
-  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, updatePassword, recoveryMode } = useAuth();
   const [mode, setMode] = useState('login'); // login | register | reset
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,6 +10,71 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Show "Set new password" form when user arrives via reset email link
+  if (recoveryMode) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-title">Study</h1>
+          <p className="auth-subtitle">Set your new password</p>
+
+          {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-message">{message}</div>}
+
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setError('');
+            setMessage('');
+            if (password.length < 6) {
+              setError('Password must be at least 6 characters');
+              return;
+            }
+            if (password !== confirmPassword) {
+              setError('Passwords do not match');
+              return;
+            }
+            setLoading(true);
+            const { error } = await updatePassword(password);
+            if (error) {
+              setError(error.message);
+            } else {
+              setMessage('Password updated successfully! Redirecting...');
+              setTimeout(() => window.location.reload(), 1500);
+            }
+            setLoading(false);
+          }}>
+            <div className="form-group">
+              <label>New Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label>Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
