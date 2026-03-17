@@ -1,0 +1,90 @@
+import React, { useState, useEffect } from 'react';
+import { getTerms, deleteTerm } from '../api';
+import TermForm from './TermForm';
+import BulkImport from './BulkImport';
+
+export default function TermsTab({ sectionId, onFindInTextbook }) {
+  const [terms, setTerms] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+
+  useEffect(() => {
+    loadTerms();
+  }, [sectionId]);
+
+  function loadTerms() {
+    getTerms(sectionId).then(setTerms).catch(console.error);
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Delete this term?')) return;
+    await deleteTerm(id);
+    loadTerms();
+  }
+
+  return (
+    <div className="term-list">
+      <div className="term-list-header">
+        <h2>Terms ({terms.length})</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn" onClick={() => { setShowBulk(!showBulk); setShowAdd(false); }}>
+            Bulk Import
+          </button>
+          <button className="btn btn-primary" onClick={() => { setShowAdd(true); setEditingId(null); setShowBulk(false); }}>
+            + Add Term
+          </button>
+        </div>
+      </div>
+
+      {showAdd && (
+        <TermForm
+          sectionId={sectionId}
+          onSaved={() => { setShowAdd(false); loadTerms(); }}
+          onCancel={() => setShowAdd(false)}
+        />
+      )}
+
+      {showBulk && (
+        <BulkImport
+          sectionId={sectionId}
+          onImported={() => { setShowBulk(false); loadTerms(); }}
+        />
+      )}
+
+      {terms.length === 0 && !showAdd && !showBulk && (
+        <p className="empty-msg">No terms yet. Add one or use Bulk Import.</p>
+      )}
+
+      {terms.map(t => (
+        <div key={t.id} className="term-card">
+          {editingId === t.id ? (
+            <TermForm
+              sectionId={sectionId}
+              existing={t}
+              onSaved={() => { setEditingId(null); loadTerms(); }}
+              onCancel={() => setEditingId(null)}
+            />
+          ) : (
+            <>
+              <div className="term-card-body" onClick={() => setEditingId(t.id)}>
+                <div className="term-word">{t.term}</div>
+                <div className="term-def">{t.definition}</div>
+                {t.notes && <div className="term-notes">{t.notes}</div>}
+              </div>
+              <div className="term-card-actions">
+                <button className="btn btn-sm" onClick={() => setEditingId(t.id)}>Edit</button>
+                {onFindInTextbook && (
+                  <button className="btn btn-sm" onClick={() => onFindInTextbook(t.term)}>
+                    Find in Textbook
+                  </button>
+                )}
+                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id)}>Delete</button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
