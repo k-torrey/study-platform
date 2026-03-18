@@ -129,6 +129,23 @@ export async function updateTerm(id, fields) {
   );
 }
 
+export async function autoFillDefinition(termId, termName, courseId) {
+  const { data: definition } = await supabase.rpc('find_definition', {
+    p_course_id: courseId,
+    p_term: termName,
+  });
+
+  if (definition && definition.trim()) {
+    unwrap(
+      await supabase.from('terms')
+        .update({ definition: definition.trim(), updated_at: new Date().toISOString() })
+        .eq('id', termId)
+    );
+    return definition.trim();
+  }
+  return null;
+}
+
 export async function deleteTerm(id) {
   // Delete associated image from storage if exists
   const { data: term } = await supabase.from('terms').select('image_url').eq('id', id).single();

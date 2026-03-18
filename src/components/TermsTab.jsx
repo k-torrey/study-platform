@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTerms, deleteTerm, uploadTermImage, removeTermImage } from '../api';
+import { getTerms, deleteTerm, uploadTermImage, removeTermImage, autoFillDefinition } from '../api';
 import TermForm from './TermForm';
 import BulkImport from './BulkImport';
 import ImageSearch from './ImageSearch';
@@ -83,12 +83,16 @@ function TermImage({ term, onUpdate, onSearchImages }) {
   );
 }
 
-export default function TermsTab({ sectionId, onFindInTextbook }) {
+export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
   const [terms, setTerms] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [imageSearchTerm, setImageSearchTerm] = useState(null);
+
+  // Auto-fill state
+  const [filling, setFilling] = useState(false);
+  const [fillProgress, setFillProgress] = useState({ current: 0, total: 0, found: 0, skipped: 0 });
 
   useEffect(() => {
     loadTerms();
@@ -104,11 +108,61 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
     loadTerms();
   }
 
+  async function handleAutoFill() {
+    const needsFilling = terms.filter(t => !t.definition || !t.definition.trim());
+    if (needsFilling.length === 0) {
+      alert('All terms already have definitions.');
+      return;
+    }
+
+    if (!courseId) {
+      alert('Course context required for auto-fill.');
+      return;
+    }
+
+    const msg = needsFilling.length === terms.length
+      ? `Auto-fill definitions for all ${needsFilling.length} terms from your textbook?`
+      : `${needsFilling.length} term${needsFilling.length > 1 ? 's' : ''} missing definitions. Auto-fill from your textbook?`;
+
+    if (!confirm(msg)) return;
+
+    setFilling(true);
+    setFillProgress({ current: 0, total: needsFilling.length, found: 0, skipped: 0 });
+
+    let found = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < needsFilling.length; i++) {
+      const t = needsFilling[i];
+      try {
+        const definition = await autoFillDefinition(t.id, t.term, courseId);
+        if (definition) {
+          found++;
+        } else {
+          skipped++;
+        }
+      } catch {
+        skipped++;
+      }
+      setFillProgress({ current: i + 1, total: needsFilling.length, found, skipped });
+    }
+
+    setFilling(false);
+    loadTerms();
+  }
+
+  const emptyDefCount = terms.filter(t => !t.definition || !t.definition.trim()).length;
+
   return (
     <div className="term-list">
       <div className="term-list-header">
         <h2>Terms ({terms.length})</h2>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {emptyDefCount > 0 && !filling && (
+            <button className="btn btn-primary" onClick={handleAutoFill}>
+              Auto-fill Definitions ({emptyDefCount})
+            </button>
+          )}
           <button className="btn" onClick={() => { setShowBulk(!showBulk); setShowAdd(false); }}>
             Bulk Import
           </button>
@@ -117,6 +171,31 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
           </button>
         </div>
       </div>
+
+      {/* Auto-fill progress */}
+      {filling && (
+        <div className="autofill-progress">
+          <div className="autofill-bar">
+            <div
+              className="autofill-bar-fill"
+              style={{ width: `${(fillProgress.current / fillProgress.total) * 100}%` }}
+            />
+          </div>
+          <p className="autofill-status">
+            Finding definitions... {fillProgress.current} / {fillProgress.total}
+            {fillProgress.found > 0 && <span className="autofill-found"> — {fillProgress.found} found</span>}
+            {fillProgress.skipped > 0 && <span className="autofill-skipped"> — {fillProgress.skipped} not found</span>}
+          </p>
+        </div>
+      )}
+
+      {/* Auto-fill results summary */}
+      {!filling && fillProgress.total > 0 && (
+        <div className="autofill-done">
+          Done! Found definitions for {fillProgress.found} of {fillProgress.total} terms.
+          {fillProgress.skipped > 0 && ` ${fillProgress.skipped} could not be found in your textbook — you can add these manually or use "Find in Textbook".`}
+        </div>
+      )}
 
       {showAdd && (
         <TermForm
@@ -138,7 +217,7 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
       )}
 
       {terms.map(t => (
-        <div key={t.id} className="term-card">
+        <div key={t.id} className={`term-card ${!t.definition?.trim() ? 'term-card-no-def' : ''}`}>
           {editingId === t.id ? (
             <TermForm
               sectionId={sectionId}
@@ -151,7 +230,9 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
               <div className="term-card-left">
                 <div className="term-card-body" onClick={() => setEditingId(t.id)}>
                   <div className="term-word">{t.term}</div>
-                  <div className="term-def">{t.definition}</div>
+                  <div className="term-def">
+                    {t.definition?.trim() || <span className="term-no-def">No definition — click Edit or use Auto-fill</span>}
+                  </div>
                   {t.notes && <div className="term-notes">{t.notes}</div>}
                 </div>
                 <div className="term-card-actions">

@@ -45,7 +45,7 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
         />
       )}
       {activeTab === 'terms' && (
-        <TermsTab sectionId={sectionId} onFindInTextbook={handleFindInTextbook} />
+        <TermsTab sectionId={sectionId} courseId={courseId} onFindInTextbook={handleFindInTextbook} />
       )}
       {activeTab === 'study' && (
         <StudyTab sectionId={sectionId} />
