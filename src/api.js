@@ -138,29 +138,15 @@ export async function clearAllDefinitions(sectionId) {
 }
 
 export async function autoFillDefinition(termId, termName, courseId) {
-  const { data: results } = await supabase.rpc('find_clean_definition', {
-    p_course_id: courseId,
-    p_term: termName,
+  const res = await fetch('/api/terms/generate-definition', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ termId, termName, courseId }),
   });
 
-  const result = results?.[0];
-  if (result?.definition && result.definition.trim()) {
-    const source = result.source_chapter
-      ? `Ch. ${result.chapter_number}: ${result.source_chapter}`
-      : '';
-
-    unwrap(
-      await supabase.from('terms')
-        .update({
-          definition: result.definition.trim(),
-          notes: source ? `Source: ${source}` : '',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', termId)
-    );
-    return result.definition.trim();
-  }
-  return null;
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.definition || null;
 }
 
 export async function deleteTerm(id) {
