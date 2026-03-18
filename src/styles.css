@@ -602,6 +602,83 @@ textarea { resize: vertical; }
   font-style: italic;
 }
 
+.term-card-row {
+  display: flex;
+  gap: 12px;
+}
+
+.term-card-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.term-card-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.term-image-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.term-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.term-image-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.term-image-container:hover .term-image-remove {
+  opacity: 1;
+}
+
+.term-image-upload {
+  width: 80px;
+  height: 80px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  transition: all var(--transition);
+}
+
+.term-image-upload:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.term-image-uploading {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
 .term-card-actions {
   display: flex;
   gap: 6px;

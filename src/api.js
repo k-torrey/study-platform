@@ -130,7 +130,56 @@ export async function updateTerm(id, fields) {
 }
 
 export async function deleteTerm(id) {
+  // Delete associated image from storage if exists
+  const { data: term } = await supabase.from('terms').select('image_url').eq('id', id).single();
+  if (term?.image_url) {
+    const path = term.image_url.split('/term-images/')[1];
+    if (path) await supabase.storage.from('term-images').remove([path]);
+  }
   return unwrap(await supabase.from('terms').delete().eq('id', id));
+}
+
+export async function uploadTermImage(termId, file) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const ext = file.name.split('.').pop().toLowerCase();
+  const filePath = `${user.id}/${termId}_${Date.now()}.${ext}`;
+
+  // Delete old image if exists
+  const { data: term } = await supabase.from('terms').select('image_url').eq('id', termId).single();
+  if (term?.image_url) {
+    const oldPath = term.image_url.split('/term-images/')[1];
+    if (oldPath) await supabase.storage.from('term-images').remove([oldPath]);
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from('term-images')
+    .upload(filePath, file, { contentType: file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('term-images')
+    .getPublicUrl(filePath);
+
+  unwrap(
+    await supabase.from('terms')
+      .update({ image_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq('id', termId)
+  );
+
+  return publicUrl;
+}
+
+export async function removeTermImage(termId) {
+  const { data: term } = await supabase.from('terms').select('image_url').eq('id', termId).single();
+  if (term?.image_url) {
+    const path = term.image_url.split('/term-images/')[1];
+    if (path) await supabase.storage.from('term-images').remove([path]);
+  }
+  unwrap(
+    await supabase.from('terms')
+      .update({ image_url: '', updated_at: new Date().toISOString() })
+      .eq('id', termId)
+  );
 }
 
 // ─── Study Progress ──────────────────────────────────────────
