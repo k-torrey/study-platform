@@ -169,6 +169,41 @@ export async function uploadTermImage(termId, file) {
   return publicUrl;
 }
 
+export async function setTermImageFromUrl(termId, imageUrl) {
+  // Delete old image from storage if it was uploaded
+  const { data: term } = await supabase.from('terms').select('image_url').eq('id', termId).single();
+  if (term?.image_url && term.image_url.includes('term-images')) {
+    const path = term.image_url.split('/term-images/')[1];
+    if (path) await supabase.storage.from('term-images').remove([path]);
+  }
+
+  unwrap(
+    await supabase.from('terms')
+      .update({ image_url: imageUrl, updated_at: new Date().toISOString() })
+      .eq('id', termId)
+  );
+
+  return imageUrl;
+}
+
+export async function searchImages(query) {
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=20&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=300&format=json&origin=*`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Image search failed');
+  const data = await res.json();
+
+  if (!data.query?.pages) return [];
+
+  return Object.values(data.query.pages)
+    .filter(p => p.imageinfo?.[0]?.thumburl)
+    .map(p => ({
+      thumb: p.imageinfo[0].thumburl,
+      full: p.imageinfo[0].url,
+      title: p.title.replace('File:', '').replace(/\.[^.]+$/, ''),
+      description: p.imageinfo[0].extmetadata?.ImageDescription?.value?.replace(/<[^>]+>/g, '').substring(0, 100) || '',
+    }));
+}
+
 export async function removeTermImage(termId) {
   const { data: term } = await supabase.from('terms').select('image_url').eq('id', termId).single();
   if (term?.image_url) {

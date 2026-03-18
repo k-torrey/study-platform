@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { getTerms, deleteTerm, uploadTermImage, removeTermImage } from '../api';
 import TermForm from './TermForm';
 import BulkImport from './BulkImport';
+import ImageSearch from './ImageSearch';
 
-function TermImage({ term, onUpdate }) {
+function TermImage({ term, onUpdate, onSearchImages }) {
   const [uploading, setUploading] = useState(false);
 
   async function handleUpload(e) {
@@ -52,25 +53,33 @@ function TermImage({ term, onUpdate }) {
   }
 
   return (
-    <label className="term-image-upload" title="Add image">
-      {uploading ? (
-        <span className="term-image-uploading">...</span>
-      ) : (
-        <>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="2" width="16" height="16" rx="2" />
-            <circle cx="7" cy="7" r="1.5" />
-            <path d="M2 14l4-4 3 3 4-5 5 6" />
-          </svg>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            onChange={handleUpload}
-            hidden
-          />
-        </>
-      )}
-    </label>
+    <div className="term-image-options">
+      <label className="term-image-upload" title="Upload image">
+        {uploading ? (
+          <span className="term-image-uploading">...</span>
+        ) : (
+          <>
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="2" width="16" height="16" rx="2" />
+              <circle cx="7" cy="7" r="1.5" />
+              <path d="M2 14l4-4 3 3 4-5 5 6" />
+            </svg>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              onChange={handleUpload}
+              hidden
+            />
+          </>
+        )}
+      </label>
+      <button className="term-image-search-btn" onClick={onSearchImages} title="Search for images online">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="9" cy="9" r="6" />
+          <path d="M13.5 13.5L17 17" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -79,6 +88,7 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
   const [editingId, setEditingId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [imageSearchTerm, setImageSearchTerm] = useState(null);
 
   useEffect(() => {
     loadTerms();
@@ -155,12 +165,24 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
                 </div>
               </div>
               <div className="term-card-right">
-                <TermImage term={t} onUpdate={loadTerms} />
+                <TermImage
+                  term={t}
+                  onUpdate={loadTerms}
+                  onSearchImages={() => setImageSearchTerm(t)}
+                />
               </div>
             </div>
           )}
         </div>
       ))}
+
+      {imageSearchTerm && (
+        <ImageSearch
+          term={imageSearchTerm}
+          onSelected={() => { setImageSearchTerm(null); loadTerms(); }}
+          onClose={() => setImageSearchTerm(null)}
+        />
+      )}
     </div>
   );
 }
