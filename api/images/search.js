@@ -14,9 +14,17 @@ export default async function handler(req, res) {
   try {
     const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(q.trim())}&gsrlimit=20&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=300&format=json&origin=*`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'StudyPlatform/2.0 (https://study-platform-bice.vercel.app; educational-app)',
+        'Accept': 'application/json',
+      },
+    });
+
     if (!response.ok) {
-      return res.status(502).json({ error: 'Wikimedia API request failed' });
+      const text = await response.text().catch(() => '');
+      console.error('Wikimedia API error:', response.status, text.substring(0, 500));
+      return res.status(502).json({ error: 'Wikimedia API returned ' + response.status });
     }
 
     const data = await response.json();
@@ -38,7 +46,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ images });
   } catch (err) {
-    console.error('Image search error:', err);
-    return res.status(500).json({ error: 'Image search failed' });
+    console.error('Image search error:', err.message, err.stack);
+    return res.status(500).json({ error: 'Image search failed: ' + err.message });
   }
 }
