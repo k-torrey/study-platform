@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getTextbooks, searchTextbook, getChapterContent, getSectionLinks, createSectionLink, deleteSectionLink } from '../api';
+import { getTextbooks, searchTextbook, getChapterContent, getSectionLinks, createSectionLink, deleteSectionLink, updateTerm } from '../api';
 
 function SafeSnippet({ html }) {
   const safe = (html || '').replace(/<(?!\/?mark\b)[^>]*>/gi, '');
@@ -13,7 +13,7 @@ function highlightTerm(text, term) {
   return text.replace(regex, '<mark>$1</mark>');
 }
 
-export default function TextbookTab({ sectionId, courseId, initialQuery, onQueryConsumed }) {
+export default function TextbookTab({ sectionId, courseId, initialQuery, onQueryConsumed, activeTerm, onDefinitionSet }) {
   const [textbooks, setTextbooks] = useState([]);
   const [selectedTb, setSelectedTb] = useState(null);
   const [query, setQuery] = useState('');
@@ -29,6 +29,10 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
   const [readerLoading, setReaderLoading] = useState(false);
   const [readerSearchTerm, setReaderSearchTerm] = useState('');
   const readerContentRef = useRef(null);
+
+  // Feedback
+  const [successMsg, setSuccessMsg] = useState('');
+  const [linkedChapterIds, setLinkedChapterIds] = useState(new Set());
 
   useEffect(() => {
     getTextbooks(courseId).then(tbs => {
@@ -47,11 +51,15 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
   }, [initialQuery, selectedTb]);
 
   function loadLinks() {
-    getSectionLinks(sectionId).then(setLinks).catch(console.error);
+    getSectionLinks(sectionId).then(data => {
+      setLinks(data);
+      setLinkedChapterIds(new Set(data.map(l => l.textbook_chapter_id)));
+    }).catch(console.error);
   }
 
   function handleSearch(q) {
     setQuery(q);
+    setSuccessMsg('');
     if (timerRef.current) clearTimeout(timerRef.current);
     if (!q.trim() || !selectedTb) {
       setResults([]);
@@ -76,14 +84,10 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
     try {
       const chapter = await getChapterContent(chapterId);
       setReaderChapter(chapter);
-
-      // Scroll to the first occurrence of the search term after render
       setTimeout(() => {
         if (readerContentRef.current) {
           const mark = readerContentRef.current.querySelector('mark');
-          if (mark) {
-            mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+          if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
     } catch {
@@ -98,12 +102,22 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
     setReaderSearchTerm('');
   }
 
+  function showSuccess(msg) {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(''), 4000);
+  }
+
   async function handleLink(chapterId, excerpt) {
+    if (linkedChapterIds.has(chapterId)) {
+      showSuccess('This chapter is already linked to this section.');
+      return;
+    }
     await createSectionLink(sectionId, {
       textbook_chapter_id: chapterId,
       excerpt: excerpt || '',
     });
     loadLinks();
+    showSuccess('Linked to section!');
   }
 
   async function handleUnlink(id) {
@@ -111,10 +125,21 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
     loadLinks();
   }
 
-  // Split content into paragraphs for readable display
+  async function handleUseAsDefinition(snippetHtml) {
+    if (!activeTerm) return;
+    const plainText = (snippetHtml || '').replace(/<[^>]+>/g, '').trim();
+    if (!plainText) return;
+    await updateTerm(activeTerm.id, {
+      term: activeTerm.term,
+      definition: plainText,
+    });
+    showSuccess(`Definition set for "${activeTerm.term}"`);
+    if (onDefinitionSet) onDefinitionSet();
+  }
+
   function renderChapterContent(content, searchTerm) {
     const paragraphs = content.split(/\n{2,}|\.\s{2,}/);
-    const html = paragraphs
+    return paragraphs
       .map(p => p.trim())
       .filter(p => p.length > 0)
       .map(p => {
@@ -123,12 +148,26 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
       })
       .map(p => `<p>${p}</p>`)
       .join('');
-    return html;
   }
+
+  const isAlreadyLinked = (chapterId) => linkedChapterIds.has(chapterId);
 
   return (
     <div className={`textbook-tab ${readerOpen ? 'textbook-tab-with-reader' : ''}`}>
       <div className="textbook-main">
+        {/* Active term banner */}
+        {activeTerm && (
+          <div className="textbook-term-banner">
+            Finding definition for: <strong>{activeTerm.term}</strong>
+            <button className="btn btn-sm btn-ghost" onClick={() => { if (onDefinitionSet) onDefinitionSet(); }}>Cancel</button>
+          </div>
+        )}
+
+        {/* Success feedback */}
+        {successMsg && (
+          <div className="textbook-success">{successMsg}</div>
+        )}
+
         {/* Linked passages */}
         {links.length > 0 && (
           <div style={{ marginBottom: '24px' }}>
@@ -175,26 +214,41 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
 
             {results.length > 0 && (
               <div className="search-results">
-                {results.map(r => (
-                  <div key={r.id} className="search-result-item" onClick={() => openReader(r.id, query)} style={{ cursor: 'pointer' }}>
-                    <h4>Ch. {r.chapter_number}: {r.title}</h4>
-                    <p><SafeSnippet html={r.snippet || ''} /></p>
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                      <button
-                        className="btn btn-sm"
-                        onClick={(e) => { e.stopPropagation(); openReader(r.id, query); }}
-                      >
-                        Read More
-                      </button>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={(e) => { e.stopPropagation(); handleLink(r.id, (r.snippet || '').replace(/<[^>]+>/g, '')); }}
-                      >
-                        Link to Section
-                      </button>
+                {results.map(r => {
+                  const linked = isAlreadyLinked(r.id);
+                  return (
+                    <div key={r.id} className={`search-result-item ${linked ? 'search-result-linked' : ''}`} onClick={() => openReader(r.id, query)} style={{ cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4>Ch. {r.chapter_number}: {r.title}</h4>
+                        {linked && <span className="linked-badge">Linked</span>}
+                      </div>
+                      <p><SafeSnippet html={r.snippet || ''} /></p>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        {activeTerm && (
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={(e) => { e.stopPropagation(); handleUseAsDefinition(r.snippet); }}
+                          >
+                            Use as Definition
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sm"
+                          onClick={(e) => { e.stopPropagation(); openReader(r.id, query); }}
+                        >
+                          Read More
+                        </button>
+                        <button
+                          className={`btn btn-sm ${linked ? '' : 'btn-primary'}`}
+                          onClick={(e) => { e.stopPropagation(); handleLink(r.id, (r.snippet || '').replace(/<[^>]+>/g, '')); }}
+                          disabled={linked}
+                        >
+                          {linked ? 'Already Linked' : 'Link to Section'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -238,12 +292,31 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
           </div>
           {readerChapter && (
             <div className="reader-footer">
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => handleLink(readerChapter.id, '')}
-              >
-                Link This Chapter to Section
-              </button>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {activeTerm && (
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => {
+                      // Use visible highlighted text as definition
+                      const sel = window.getSelection();
+                      if (sel && sel.toString().trim()) {
+                        handleUseAsDefinition(sel.toString());
+                      } else {
+                        alert('Select (highlight) the text you want to use as the definition, then click this button.');
+                      }
+                    }}
+                  >
+                    Use Selected Text as Definition
+                  </button>
+                )}
+                <button
+                  className={`btn btn-sm ${isAlreadyLinked(readerChapter.id) ? '' : 'btn-primary'}`}
+                  onClick={() => handleLink(readerChapter.id, '')}
+                  disabled={isAlreadyLinked(readerChapter.id)}
+                >
+                  {isAlreadyLinked(readerChapter.id) ? 'Already Linked' : 'Link Chapter to Section'}
+                </button>
+              </div>
             </div>
           )}
         </div>

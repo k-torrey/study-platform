@@ -15,9 +15,11 @@ const TABS = [
 export default function SectionPage({ sectionId, sectionName, courseId, onBack }) {
   const [activeTab, setActiveTab] = useState('terms');
   const [textbookSearchQuery, setTextbookSearchQuery] = useState('');
+  const [activeTerm, setActiveTerm] = useState(null); // { id, term } when searching from a term
 
-  function handleFindInTextbook(term) {
-    setTextbookSearchQuery(term);
+  function handleFindInTextbook(termId, termName) {
+    setActiveTerm({ id: termId, term: termName });
+    setTextbookSearchQuery(termName);
     setActiveTab('textbook');
   }
 
@@ -27,7 +29,10 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
         <h2>{sectionName}</h2>
       </div>
 
-      <TabBar tabs={TABS} active={activeTab} onChange={setActiveTab} />
+      <TabBar tabs={TABS} active={activeTab} onChange={(tab) => {
+        setActiveTab(tab);
+        if (tab !== 'textbook') setActiveTerm(null);
+      }} />
 
       {activeTab === 'textbook' && (
         <TextbookTab
@@ -35,6 +40,8 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
           courseId={courseId}
           initialQuery={textbookSearchQuery}
           onQueryConsumed={() => setTextbookSearchQuery('')}
+          activeTerm={activeTerm}
+          onDefinitionSet={() => setActiveTerm(null)}
         />
       )}
       {activeTab === 'terms' && (

@@ -147,7 +147,7 @@ export default function TermsTab({ sectionId, onFindInTextbook }) {
                 <div className="term-card-actions">
                   <button className="btn btn-sm" onClick={() => setEditingId(t.id)}>Edit</button>
                   {onFindInTextbook && (
-                    <button className="btn btn-sm" onClick={() => onFindInTextbook(t.term)}>
+                    <button className="btn btn-sm" onClick={() => onFindInTextbook(t.id, t.term)}>
                       Find in Textbook
                     </button>
                   )}
