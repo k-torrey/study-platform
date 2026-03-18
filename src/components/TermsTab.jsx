@@ -246,7 +246,11 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
                   <div className="term-def">
                     {t.definition?.trim() || <span className="term-no-def">No definition — click Edit or use Auto-fill</span>}
                   </div>
-                  {t.notes && <div className="term-notes">{t.notes}</div>}
+                  {t.notes && t.notes.startsWith('Source:') ? (
+                    <div className="term-source">{t.notes}</div>
+                  ) : t.notes ? (
+                    <div className="term-notes">{t.notes}</div>
+                  ) : null}
                 </div>
                 <div className="term-card-actions">
                   <button className="btn btn-sm" onClick={() => setEditingId(t.id)}>Edit</button>

@@ -653,6 +653,13 @@ textarea { resize: vertical; }
   font-style: italic;
 }
 
+.term-source {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
 .term-card-row {
   display: flex;
   gap: 12px;
