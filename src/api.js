@@ -111,7 +111,10 @@ export async function createTerm(fields) {
 }
 
 export async function bulkImportTerms({ section_id, terms }) {
-  const rows = terms.map(t => ({ section_id, term: t.term, definition: t.definition, notes: t.notes || '' }));
+  const rows = terms
+    .filter(t => t.term && t.term.trim())
+    .map(t => ({ section_id, term: t.term.trim(), definition: (t.definition || '').trim(), notes: t.notes || '' }));
+  if (rows.length === 0) throw new Error('No valid terms to import');
   return unwrap(await supabase.from('terms').insert(rows).select());
 }
 

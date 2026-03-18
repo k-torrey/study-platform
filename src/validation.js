@@ -17,7 +17,7 @@ export const sectionSchema = z.object({
 
 export const termSchema = z.object({
   term: z.string().trim().min(1, 'Term is required').max(5000, 'Term too long'),
-  definition: z.string().trim().min(1, 'Definition is required').max(5000, 'Definition too long'),
+  definition: z.string().trim().max(5000, 'Definition too long').default(''),
   notes: z.string().trim().max(5000, 'Notes too long').default(''),
 });
 

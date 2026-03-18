@@ -6,6 +6,7 @@ const DELIMITERS = [
   { key: 'tab', label: 'Tab' },
   { key: 'dash', label: 'Dash ( - )' },
   { key: 'colon', label: 'Colon ( : )' },
+  { key: 'terms_only', label: 'Terms only (no definitions)' },
 ];
 
 function parseLine(line, delimiter) {
@@ -43,6 +44,16 @@ function detectDelimiter(lines) {
 
 function parseAll(text, delimiterKey) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Terms-only mode: each line is a term with no definition
+  if (delimiterKey === 'terms_only') {
+    const results = lines
+      .map(line => line.replace(/^\d+[.)]\s*/, '').trim())
+      .filter(line => line.length > 0)
+      .map(line => ({ term: line, definition: '' }));
+    return { results, detectedDelimiter: 'terms_only' };
+  }
+
   const delimiter = delimiterKey === 'auto' ? detectDelimiter(lines) : delimiterKey;
 
   const results = [];
@@ -52,6 +63,16 @@ function parseAll(text, delimiterKey) {
       results.push({ term: parsed[0], definition: parsed[1] });
     }
   }
+
+  // If auto-detect found 0 results, suggest terms-only mode
+  if (delimiterKey === 'auto' && results.length === 0 && lines.length > 0) {
+    const termsOnly = lines
+      .map(line => line.replace(/^\d+[.)]\s*/, '').trim())
+      .filter(line => line.length > 0)
+      .map(line => ({ term: line, definition: '' }));
+    return { results: termsOnly, detectedDelimiter: 'terms_only' };
+  }
+
   return { results, detectedDelimiter: delimiter };
 }
 
@@ -200,6 +221,11 @@ export default function BulkImport({ sectionId, onImported }) {
               <span className="detected-del"> — detected: {detectedDel}</span>
             )}
           </h3>
+          {detectedDel === 'terms_only' && (
+            <p className="help-text" style={{ marginBottom: '8px' }}>
+              No definitions detected — importing as terms only. You can add definitions later by editing each term.
+            </p>
+          )}
           {preview.length === 0 ? (
             <p className="empty-msg">No terms could be parsed. Try a different delimiter.</p>
           ) : (
