@@ -55,17 +55,76 @@ function parseAll(text, delimiterKey) {
   return { results, detectedDelimiter: delimiter };
 }
 
+async function extractTextFromFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  // Plain text / CSV
+  if (['txt', 'csv', 'tsv'].includes(ext)) {
+    return await file.text();
+  }
+
+  // Word documents (.docx)
+  if (['docx'].includes(ext)) {
+    const mammoth = await import('mammoth');
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  }
+
+  // PDF — send to serverless function
+  if (ext === 'pdf') {
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    const res = await fetch('/api/terms/extract-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileBase64: base64, fileName: file.name }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to process PDF' }));
+      throw new Error(err.error);
+    }
+
+    const data = await res.json();
+    return data.text;
+  }
+
+  throw new Error(`Unsupported file type: .${ext}. Supported: .txt, .csv, .tsv, .docx, .pdf`);
+}
+
 export default function BulkImport({ sectionId, onImported }) {
   const [text, setText] = useState('');
   const [delimiter, setDelimiter] = useState('auto');
   const [preview, setPreview] = useState(null);
   const [detectedDel, setDetectedDel] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
 
   function handlePreview() {
     const { results, detectedDelimiter } = parseAll(text, delimiter);
     setPreview(results);
     setDetectedDel(detectedDelimiter);
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setFileLoading(true);
+    setPreview(null);
+    try {
+      const extracted = await extractTextFromFile(file);
+      setText(extracted);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setFileLoading(false);
+      e.target.value = '';
+    }
   }
 
   async function handleImport() {
@@ -87,26 +146,38 @@ export default function BulkImport({ sectionId, onImported }) {
     <div className="bulk-import">
       <h2>Bulk Import Terms</h2>
       <p className="help-text">
-        Paste your term list below. Supported formats: tab-separated, dash-separated (term - definition),
-        colon-separated (term: definition), or numbered lists.
+        Upload a file or paste your term list below. Each line should have a term and definition
+        separated by a tab, dash, or colon. Supported files: PDF, Word (.docx), TXT, CSV.
       </p>
 
-      <div className="import-controls">
-        <label>
-          Delimiter:
-          <select value={delimiter} onChange={e => { setDelimiter(e.target.value); setPreview(null); }}>
-            {DELIMITERS.map(d => (
-              <option key={d.key} value={d.key}>{d.label}</option>
-            ))}
-          </select>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <label className="btn" style={{ cursor: 'pointer' }}>
+          {fileLoading ? 'Reading file...' : 'Upload File'}
+          <input
+            type="file"
+            accept=".pdf,.docx,.txt,.csv,.tsv"
+            onChange={handleFileUpload}
+            hidden
+            disabled={fileLoading}
+          />
         </label>
+        <div className="import-controls" style={{ marginBottom: 0 }}>
+          <label>
+            Delimiter:
+            <select value={delimiter} onChange={e => { setDelimiter(e.target.value); setPreview(null); }}>
+              {DELIMITERS.map(d => (
+                <option key={d.key} value={d.key}>{d.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <textarea
         className="import-textarea"
         value={text}
         onChange={e => { setText(e.target.value); setPreview(null); }}
-        placeholder={`Paste terms here, e.g.:\nHumerus\tUpper arm bone\nFemur\tThigh bone\n\nor:\nHumerus - Upper arm bone\nFemur - Thigh bone`}
+        placeholder={`Paste terms here, or upload a file above.\n\nSupported formats:\nHumerus\tUpper arm bone\nFemur - Thigh bone\nTibia: Shin bone`}
         rows={10}
       />
 
