@@ -488,6 +488,15 @@ export async function getTextbookChapters(id) {
   );
 }
 
+export async function getChapterContent(chapterId) {
+  return unwrap(
+    await supabase.from('textbook_chapters')
+      .select('id, chapter_number, title, content')
+      .eq('id', chapterId)
+      .single()
+  );
+}
+
 export async function searchTextbook(id, query) {
   return unwrap(
     await supabase.rpc('search_textbook_chapters', {
