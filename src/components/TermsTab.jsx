@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTerms, deleteTerm, uploadTermImage, removeTermImage, autoFillDefinition } from '../api';
+import { getTerms, deleteTerm, uploadTermImage, removeTermImage, autoFillDefinition, clearAllDefinitions } from '../api';
 import TermForm from './TermForm';
 import BulkImport from './BulkImport';
 import ImageSearch from './ImageSearch';
@@ -152,6 +152,14 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
   }
 
   const emptyDefCount = terms.filter(t => !t.definition || !t.definition.trim()).length;
+  const hasDefCount = terms.filter(t => t.definition && t.definition.trim()).length;
+
+  async function handleClearDefinitions() {
+    if (!confirm(`Clear all definitions for ${hasDefCount} terms? The terms themselves will be kept.`)) return;
+    await clearAllDefinitions(sectionId);
+    setFillProgress({ current: 0, total: 0, found: 0, skipped: 0 });
+    loadTerms();
+  }
 
   return (
     <div className="term-list">
@@ -161,6 +169,11 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
           {emptyDefCount > 0 && !filling && (
             <button className="btn btn-primary" onClick={handleAutoFill}>
               Auto-fill Definitions ({emptyDefCount})
+            </button>
+          )}
+          {hasDefCount > 0 && !filling && (
+            <button className="btn btn-danger" onClick={handleClearDefinitions}>
+              Clear Definitions
             </button>
           )}
           <button className="btn" onClick={() => { setShowBulk(!showBulk); setShowAdd(false); }}>

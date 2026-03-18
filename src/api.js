@@ -129,6 +129,14 @@ export async function updateTerm(id, fields) {
   );
 }
 
+export async function clearAllDefinitions(sectionId) {
+  return unwrap(
+    await supabase.from('terms')
+      .update({ definition: '', updated_at: new Date().toISOString() })
+      .eq('section_id', sectionId)
+  );
+}
+
 export async function autoFillDefinition(termId, termName, courseId) {
   const { data: definition } = await supabase.rpc('find_definition', {
     p_course_id: courseId,
