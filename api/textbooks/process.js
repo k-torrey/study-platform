@@ -131,6 +131,20 @@ export default async function handler(req, res) {
       const spineItems = opf?.package?.spine?.itemref;
       const spineRefs = Array.isArray(spineItems) ? spineItems : [spineItems].filter(Boolean);
 
+      function stripHtml(html) {
+        return html
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#\d+;/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
       let chapterNum = 0;
       for (const ref of spineRefs) {
         const idref = ref['@_idref'];
@@ -142,29 +156,51 @@ export default async function handler(req, res) {
         if (!entry) continue;
 
         const xhtml = entry.getData().toString('utf-8');
-
-        // Strip HTML tags to get plain text
-        const text = xhtml
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&#\d+;/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const text = stripHtml(xhtml);
 
         if (text.length < 50) continue;
 
-        chapterNum++;
-        const titleMatch = xhtml.match(/<h[12][^>]*>(.*?)<\/h[12]>/i);
-        const title = titleMatch
-          ? titleMatch[1].replace(/<[^>]+>/g, '').trim()
-          : `Chapter ${chapterNum}`;
+        // If this spine item is very large, try to split by chapter headings
+        // Step 1: find all h1 tags. Step 2: filter for ones containing "CHAPTER N"
+        const allH1s = [...xhtml.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)];
+        const splitMatches = allH1s.filter(m => /CHAPTER\s+\d+/.test(m[1]));
 
-        chapters.push({ chapter_number: chapterNum, title, content: text });
+        if (splitMatches.length >= 2 && text.length > 100000) {
+          // Include content before the first chapter as "Preface"
+          if (splitMatches[0].index > 1000) {
+            const prefaceText = stripHtml(xhtml.slice(0, splitMatches[0].index));
+            if (prefaceText.length >= 50) {
+              chapterNum++;
+              chapters.push({ chapter_number: chapterNum, title: 'Preface', content: prefaceText });
+            }
+          }
+
+          // Split the large content by chapter headings
+          for (let i = 0; i < splitMatches.length; i++) {
+            const start = splitMatches[i].index;
+            const end = i + 1 < splitMatches.length ? splitMatches[i + 1].index : xhtml.length;
+            const chunkXhtml = xhtml.slice(start, end);
+            const chunkText = stripHtml(chunkXhtml);
+
+            if (chunkText.length < 50) continue;
+
+            chapterNum++;
+            // Extract title from the h1 tag
+            const titleRaw = splitMatches[i][0].replace(/<[^>]+>/g, '').trim();
+            const title = titleRaw || `Chapter ${chapterNum}`;
+
+            chapters.push({ chapter_number: chapterNum, title, content: chunkText });
+          }
+        } else {
+          // Normal single chapter from this spine item
+          chapterNum++;
+          const titleMatch = xhtml.match(/<h[12][^>]*>(.*?)<\/h[12]>/i);
+          const title = titleMatch
+            ? titleMatch[1].replace(/<[^>]+>/g, '').trim()
+            : `Chapter ${chapterNum}`;
+
+          chapters.push({ chapter_number: chapterNum, title, content: text });
+        }
       }
     } else {
       return res.status(400).json({ error: 'Unsupported file type: ' + ext });
