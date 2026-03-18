@@ -8,7 +8,7 @@ import ExamPage from './components/ExamPage';
 import SectionPage from './components/SectionPage';
 
 export default function App() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, recoveryMode } = useAuth();
 
   const [nav, setNav] = useState({ view: 'home' });
   const [refreshKey, setRefreshKey] = useState(0);
@@ -22,7 +22,8 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  // Show password reset form even if user has a session from the recovery token
+  if (!user || recoveryMode) {
     return <AuthPage />;
   }
 

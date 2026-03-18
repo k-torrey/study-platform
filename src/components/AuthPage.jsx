@@ -86,7 +86,7 @@ export default function AuthPage() {
       if (mode === 'reset') {
         const { error } = await resetPassword(email);
         if (error) throw error;
-        setMessage('Check your email for a password reset link.');
+        setMessage('If an account exists with that email, you\'ll receive a password reset link shortly. Check your inbox and spam folder.');
         setLoading(false);
         return;
       }
@@ -130,6 +130,9 @@ export default function AuthPage() {
           {mode === 'register' && 'Create a new account'}
           {mode === 'reset' && 'Reset your password'}
         </p>
+        {mode === 'reset' && (
+          <p className="auth-hint">Enter the email address you used to create your account</p>
+        )}
 
         {error && <div className="auth-error">{error}</div>}
         {message && <div className="auth-message">{message}</div>}

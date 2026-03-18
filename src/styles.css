@@ -208,6 +208,14 @@ body {
   text-decoration: underline;
 }
 
+.auth-hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: -12px;
+  margin-bottom: 16px;
+}
+
 /* ─── Breadcrumb ─── */
 .breadcrumb {
   display: flex;
