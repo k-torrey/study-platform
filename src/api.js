@@ -187,21 +187,10 @@ export async function setTermImageFromUrl(termId, imageUrl) {
 }
 
 export async function searchImages(query) {
-  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=20&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=300&format=json&origin=*`;
-  const res = await fetch(url);
+  const res = await fetch(`/api/images/search?q=${encodeURIComponent(query)}`);
   if (!res.ok) throw new Error('Image search failed');
   const data = await res.json();
-
-  if (!data.query?.pages) return [];
-
-  return Object.values(data.query.pages)
-    .filter(p => p.imageinfo?.[0]?.thumburl)
-    .map(p => ({
-      thumb: p.imageinfo[0].thumburl,
-      full: p.imageinfo[0].url,
-      title: p.title.replace('File:', '').replace(/\.[^.]+$/, ''),
-      description: p.imageinfo[0].extmetadata?.ImageDescription?.value?.replace(/<[^>]+>/g, '').substring(0, 100) || '',
-    }));
+  return data.images || [];
 }
 
 export async function removeTermImage(termId) {

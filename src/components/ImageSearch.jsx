@@ -18,7 +18,8 @@ export default function ImageSearch({ term, onSelected, onClose }) {
     try {
       const images = await searchImages(q.trim());
       setResults(images);
-    } catch {
+    } catch (err) {
+      console.error('Image search error:', err);
       setResults([]);
     }
     setLoading(false);
