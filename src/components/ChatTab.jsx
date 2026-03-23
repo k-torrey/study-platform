@@ -39,17 +39,68 @@ function highlightTerms(text, question) {
   return text.replace(new RegExp(`(${combined})`, 'gi'), '<mark>$1</mark>');
 }
 
-function renderChapterContent(content, searchTerms) {
-  const paragraphs = content.split(/\n{2,}|\.\s{2,}/);
-  return paragraphs
-    .map(p => p.trim())
-    .filter(p => p.length > 0)
-    .map(p => {
+function renderChapterWithPassage(content, passage) {
+  if (!passage) {
+    // No passage — just render plain chapter
+    const paragraphs = content.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
+    return paragraphs.map(p => {
       const safe = p.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return searchTerms ? highlightTerms(safe, searchTerms) : safe;
-    })
-    .map(p => `<p>${p}</p>`)
-    .join('');
+      return `<p>${safe}</p>`;
+    }).join('');
+  }
+
+  // Find the passage location in the chapter by searching for a unique substring
+  const normalized = content.replace(/\s+/g, ' ');
+  const passageNorm = passage.replace(/\s+/g, ' ').trim();
+
+  // Try progressively shorter substrings from the passage until we find a match
+  let matchStart = -1;
+  let matchLen = 0;
+  const attempts = [
+    passageNorm.slice(0, 200),
+    passageNorm.slice(0, 120),
+    passageNorm.slice(0, 80),
+    passageNorm.slice(50, 150),
+    passageNorm.slice(0, 50),
+  ];
+
+  for (const attempt of attempts) {
+    if (attempt.length < 20) continue;
+    const idx = normalized.indexOf(attempt);
+    if (idx >= 0) {
+      matchStart = idx;
+      // Extend to cover as much of the passage as we can find
+      matchLen = Math.min(passageNorm.length, normalized.length - idx);
+      // Verify the extended match
+      const extended = normalized.slice(idx, idx + matchLen);
+      if (extended.slice(0, attempt.length) === attempt) {
+        break;
+      }
+    }
+  }
+
+  if (matchStart < 0) {
+    // Couldn't find passage — render plain
+    const paragraphs = content.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
+    return paragraphs.map(p => {
+      const safe = p.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<p>${safe}</p>`;
+    }).join('');
+  }
+
+  // Split chapter into: before, highlighted passage, after
+  const before = normalized.slice(0, matchStart);
+  const highlighted = normalized.slice(matchStart, matchStart + matchLen);
+  const after = normalized.slice(matchStart + matchLen);
+
+  function renderSection(text) {
+    return text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0)
+      .map(p => `<p>${p.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('');
+  }
+
+  return renderSection(before)
+    + `<div class="passage-highlight" id="passage-anchor">${renderSection(highlighted)}</div>`
+    + renderSection(after);
 }
 
 function MessageContent({ text, onCiteClick }) {
@@ -142,45 +193,27 @@ export default function ChatTab({ courseId }) {
     }
   }
 
-  // Extract a unique phrase from a passage to use as highlight anchor
-  function getAnchorPhrase(passage) {
-    if (!passage) return '';
-    // Split into sentences, find one that's 40-150 chars (distinctive enough)
-    const sentences = passage.split(/(?<=[.!])\s+/).filter(s => s.length > 30 && s.length < 200);
-    if (sentences.length > 0) {
-      // Pick the first substantial sentence — extract 6-10 words from the middle
-      const sent = sentences[0];
-      const words = sent.split(/\s+/);
-      const start = Math.max(0, Math.floor(words.length * 0.2));
-      const phrase = words.slice(start, start + 8).join(' ');
-      return phrase;
-    }
-    // Fallback: take a chunk from the middle of the passage
-    const mid = Math.floor(passage.length * 0.3);
-    return passage.slice(mid, mid + 60).trim();
-  }
+  const [readerPassage, setReaderPassage] = useState('');
 
   async function openReader(chapterId, searchTerm, passage) {
     setReaderLoading(true);
     setReaderOpen(true);
-    // Use a distinctive phrase from the passage to anchor the highlight
-    const anchor = passage ? getAnchorPhrase(passage) : searchTerm;
-    setReaderSearchTerm(anchor || searchTerm || '');
+    setReaderPassage(passage || '');
+    setReaderSearchTerm(searchTerm || '');
     try {
       const chapter = await getChapterContent(chapterId);
       setReaderChapter(chapter);
-      setTimeout(() => {
+      const scrollToHighlight = () => {
         if (readerContentRef.current) {
-          const mark = readerContentRef.current.querySelector('mark');
-          if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const anchor = readerContentRef.current.querySelector('#passage-anchor');
+          if (anchor) {
+            anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
         }
-      }, 200);
-      setTimeout(() => {
-        if (readerContentRef.current) {
-          const mark = readerContentRef.current.querySelector('mark');
-          if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 600);
+      };
+      setTimeout(scrollToHighlight, 200);
+      setTimeout(scrollToHighlight, 600);
     } catch {
       setReaderChapter(null);
     }
@@ -282,7 +315,7 @@ export default function ChatTab({ courseId }) {
               <div
                 className="reader-text"
                 dangerouslySetInnerHTML={{
-                  __html: renderChapterContent(readerChapter.content, readerSearchTerm)
+                  __html: renderChapterWithPassage(readerChapter.content, readerPassage)
                 }}
               />
             )}

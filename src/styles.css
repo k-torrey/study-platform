@@ -1774,6 +1774,20 @@ textarea { resize: vertical; }
   color: #fff;
 }
 
+/* Highlighted passage block in reader */
+.passage-highlight {
+  background: var(--accent-light);
+  border-left: 4px solid var(--accent);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-2) calc(-1 * var(--space-4));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+:root[data-theme="dark"] .passage-highlight {
+  background: rgba(99, 102, 241, 0.15);
+  border-left-color: var(--accent);
+}
+
 /* Typing indicator */
 .chat-typing {
   display: flex;
