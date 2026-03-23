@@ -1,5 +1,9 @@
 {
   "framework": "vite",
+  "functions": {
+    "api/terms/batch-definitions.js": { "maxDuration": 300 },
+    "api/textbooks/embed.js": { "maxDuration": 300 }
+  },
   "headers": [
     {
       "source": "/(.*)",

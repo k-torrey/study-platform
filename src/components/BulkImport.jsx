@@ -45,7 +45,6 @@ function detectDelimiter(lines) {
 function parseAll(text, delimiterKey) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Terms-only mode: each line is a term with no definition
   if (delimiterKey === 'terms_only') {
     const results = lines
       .map(line => line.replace(/^\d+[.)]\s*/, '').trim())
@@ -64,7 +63,6 @@ function parseAll(text, delimiterKey) {
     }
   }
 
-  // If auto-detect found 0 results, suggest terms-only mode
   if (delimiterKey === 'auto' && results.length === 0 && lines.length > 0) {
     const termsOnly = lines
       .map(line => line.replace(/^\d+[.)]\s*/, '').trim())
@@ -79,12 +77,10 @@ function parseAll(text, delimiterKey) {
 async function extractTextFromFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
 
-  // Plain text / CSV
   if (['txt', 'csv', 'tsv'].includes(ext)) {
     return await file.text();
   }
 
-  // Word documents (.docx)
   if (['docx'].includes(ext)) {
     const mammoth = await import('mammoth');
     const arrayBuffer = await file.arrayBuffer();
@@ -92,7 +88,6 @@ async function extractTextFromFile(file) {
     return result.value;
   }
 
-  // PDF — send to serverless function
   if (ext === 'pdf') {
     const arrayBuffer = await file.arrayBuffer();
     const base64 = btoa(
@@ -171,8 +166,8 @@ export default function BulkImport({ sectionId, onImported }) {
         separated by a tab, dash, or colon. Supported files: PDF, Word (.docx), TXT, CSV.
       </p>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-        <label className="btn" style={{ cursor: 'pointer' }}>
+      <div className="flex-row mb-3">
+        <label className="btn">
           {fileLoading ? 'Reading file...' : 'Upload File'}
           <input
             type="file"
@@ -222,7 +217,7 @@ export default function BulkImport({ sectionId, onImported }) {
             )}
           </h3>
           {detectedDel === 'terms_only' && (
-            <p className="help-text" style={{ marginBottom: '8px' }}>
+            <p className="help-text mb-2">
               No definitions detected — importing as terms only. You can add definitions later by editing each term.
             </p>
           )}

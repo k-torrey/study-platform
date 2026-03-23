@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTerms, deleteTerm, uploadTermImage, removeTermImage, autoFillDefinition, clearAllDefinitions } from '../api';
+import { getTerms, deleteTerm, uploadTermImage, removeTermImage, batchAutoFillDefinitions, clearAllDefinitions } from '../api';
 import TermForm from './TermForm';
 import BulkImport from './BulkImport';
 import ImageSearch from './ImageSearch';
@@ -84,7 +84,7 @@ function TermImage({ term, onUpdate, onSearchImages }) {
 }
 
 export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
-  const [terms, setTerms] = useState([]);
+  const [terms, setTerms] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
@@ -109,6 +109,7 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
   }
 
   async function handleAutoFill() {
+    if (!terms) return;
     const needsFilling = terms.filter(t => !t.definition || !t.definition.trim());
     if (needsFilling.length === 0) {
       alert('All terms already have definitions.');
@@ -129,26 +130,33 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
     setFilling(true);
     setFillProgress({ current: 0, total: needsFilling.length, found: 0, skipped: 0 });
 
-    let found = 0;
-    let skipped = 0;
-
-    for (let i = 0; i < needsFilling.length; i++) {
-      const t = needsFilling[i];
-      try {
-        const definition = await autoFillDefinition(t.id, t.term, courseId);
-        if (definition) {
-          found++;
-        } else {
-          skipped++;
-        }
-      } catch {
-        skipped++;
-      }
-      setFillProgress({ current: i + 1, total: needsFilling.length, found, skipped });
+    try {
+      const result = await batchAutoFillDefinitions(sectionId, courseId, (current, total, found) => {
+        setFillProgress({ current, total, found, skipped: current - found });
+      });
+      setFillProgress({
+        current: needsFilling.length,
+        total: needsFilling.length,
+        found: result.filled || 0,
+        skipped: needsFilling.length - (result.filled || 0),
+      });
+    } catch (err) {
+      alert('Auto-fill failed: ' + err.message);
     }
 
     setFilling(false);
     loadTerms();
+  }
+
+  // Loading skeleton
+  if (terms === null) {
+    return (
+      <div className="term-list">
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="skeleton skeleton-row" />
+        ))}
+      </div>
+    );
   }
 
   const emptyDefCount = terms.filter(t => !t.definition || !t.definition.trim()).length;
@@ -165,7 +173,7 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
     <div className="term-list">
       <div className="term-list-header">
         <h2>Terms ({terms.length})</h2>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="flex-row-wrap">
           {emptyDefCount > 0 && !filling && (
             <button className="btn btn-primary" onClick={handleAutoFill}>
               Auto-fill Definitions ({emptyDefCount})
@@ -226,11 +234,20 @@ export default function TermsTab({ sectionId, courseId, onFindInTextbook }) {
       )}
 
       {terms.length === 0 && !showAdd && !showBulk && (
-        <p className="empty-msg">No terms yet. Add one or use Bulk Import.</p>
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+            </svg>
+          </div>
+          <h2>No terms yet</h2>
+          <p>Add terms one at a time or use Bulk Import to add many at once.</p>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add Term</button>
+        </div>
       )}
 
       {terms.map(t => (
-        <div key={t.id} className={`term-card ${!t.definition?.trim() ? 'term-card-no-def' : ''}`}>
+        <div key={t.id} id={`term-${t.id}`} className={`term-card ${!t.definition?.trim() ? 'term-card-no-def' : ''}`}>
           {editingId === t.id ? (
             <TermForm
               sectionId={sectionId}

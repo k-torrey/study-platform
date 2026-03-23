@@ -4,12 +4,11 @@ import { getStudyQueue, submitAnswer } from '../api';
 export default function FlashcardSession({ sectionId, onBack }) {
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [userInput, setUserInput] = useState('');
-  const [revealed, setRevealed] = useState(false);
-  const [direction, setDirection] = useState('def_to_term');
-  const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0 });
+  const [flipped, setFlipped] = useState(false);
+  const [direction, setDirection] = useState('term_to_def');
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
+  const [stats, setStats] = useState({ got: 0, practice: 0 });
 
   useEffect(() => {
     getStudyQueue(sectionId, 'flashcard').then(data => {
@@ -19,102 +18,111 @@ export default function FlashcardSession({ sectionId, onBack }) {
     }).catch(console.error);
   }, [sectionId]);
 
-  if (loading) return <div className="empty-msg">Loading flashcards...</div>;
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!flipped) setFlipped(true);
+      }
+      if (flipped && e.key === 'ArrowRight') advance(2);
+      if (flipped && e.key === 'ArrowLeft') advance(0);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [flipped, currentIndex, queue.length]);
 
-  if (done) {
-    return (
-      <div className="study-session">
-        <h2>Session Complete</h2>
-        <div className="test-score">
-          {sessionStats.correct} / {sessionStats.total} correct
-          {sessionStats.total > 0 && (
-            <span> — {Math.round((sessionStats.correct / sessionStats.total) * 100)}%</span>
-          )}
-        </div>
-        <button className="btn btn-primary" onClick={onBack} style={{ marginTop: '16px' }}>
-          Back to Study
-        </button>
-      </div>
+  function advance(quality) {
+    submitAnswer({ term_id: queue[currentIndex].id, quality }).catch(console.error);
+    setStats(s => quality >= 2
+      ? { ...s, got: s.got + 1 }
+      : { ...s, practice: s.practice + 1 }
     );
-  }
-
-  const card = queue[currentIndex];
-  const prompt = direction === 'def_to_term' ? card.definition : card.term;
-  const answer = direction === 'def_to_term' ? card.term : card.definition;
-
-  const handleCheck = () => setRevealed(true);
-
-  const isCorrect = () => userInput.trim().toLowerCase() === answer.trim().toLowerCase();
-
-  const handleQuality = async (quality) => {
-    const correct = quality >= 1;
-    setSessionStats(s => ({
-      correct: s.correct + (correct ? 1 : 0),
-      total: s.total + 1,
-    }));
-    await submitAnswer({ term_id: card.id, quality }).catch(console.error);
 
     if (currentIndex + 1 >= queue.length) {
       setDone(true);
     } else {
       setCurrentIndex(currentIndex + 1);
-      setUserInput('');
-      setRevealed(false);
+      setFlipped(false);
     }
-  };
+  }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !revealed) handleCheck();
-  };
+  if (loading) {
+    return (
+      <div className="study-session">
+        <div className="skeleton skeleton-block" />
+      </div>
+    );
+  }
+
+  if (done) {
+    return (
+      <div className="study-session">
+        <h2>Session Complete!</h2>
+        <div className="flashcard-results">
+          <div className="flashcard-result-stat got-it">
+            <span className="flashcard-result-num">{stats.got}</span>
+            <span>Got it</span>
+          </div>
+          <div className="flashcard-result-stat needs-practice">
+            <span className="flashcard-result-num">{stats.practice}</span>
+            <span>Needs practice</span>
+          </div>
+        </div>
+        <div className="text-center mt-4">
+          <button className="btn btn-primary" onClick={onBack}>Back to Study</button>
+        </div>
+      </div>
+    );
+  }
+
+  const card = queue[currentIndex];
+  const front = direction === 'term_to_def' ? card.term : card.definition;
+  const back = direction === 'term_to_def' ? card.definition : card.term;
+  const frontLabel = direction === 'term_to_def' ? 'Term' : 'Definition';
+  const backLabel = direction === 'term_to_def' ? 'Definition' : 'Term';
+  const progressPct = ((currentIndex + 1) / queue.length * 100).toFixed(0);
 
   return (
     <div className="study-session">
       <div className="study-session-header">
         <button className="btn btn-ghost" onClick={onBack}>&larr; Back</button>
-        <span className="study-progress-text">Card {currentIndex + 1} of {queue.length}</span>
+        <span className="study-progress-text">{currentIndex + 1} / {queue.length}</span>
         <button
           className="btn btn-sm"
-          onClick={() => setDirection(d => d === 'def_to_term' ? 'term_to_def' : 'def_to_term')}
-          title="Switch direction"
+          onClick={() => { setDirection(d => d === 'term_to_def' ? 'def_to_term' : 'term_to_def'); setFlipped(false); }}
         >
           Flip direction
         </button>
       </div>
 
-      <div className="study-card">
-        <div className="study-card-prompt">{prompt}</div>
+      <div className="study-session-progress-bar">
+        <div className="study-session-progress-bar-fill" style={{ width: progressPct + '%' }} />
+      </div>
 
-        {!revealed ? (
-          <div className="study-card-input-area">
-            <input
-              className="study-input"
-              type="text"
-              value={userInput}
-              onChange={e => setUserInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={direction === 'def_to_term' ? 'Type the term...' : 'Type the definition...'}
-              autoFocus
-            />
-            <button className="btn btn-primary" onClick={handleCheck}>Check</button>
+      <div
+        className={`flashcard ${flipped ? 'flashcard-flipped' : ''}`}
+        onClick={() => setFlipped(f => !f)}
+      >
+        <div className="flashcard-inner">
+          <div className="flashcard-front">
+            <span className="flashcard-label">{frontLabel}</span>
+            <div className="flashcard-text">{front || '(no content)'}</div>
+            <span className="flashcard-hint">Tap to flip</span>
           </div>
-        ) : (
-          <div className="study-card-reveal">
-            <div className={`study-input-result ${isCorrect() ? 'correct' : 'incorrect'}`}>
-              <div>Your answer: {userInput || '(blank)'}</div>
-              {!isCorrect() && <div>Correct answer: {answer}</div>}
-            </div>
-            <div className="quality-buttons">
-              <button className={`btn quality-btn q-again ${!isCorrect() ? 'suggested' : ''}`} onClick={() => handleQuality(0)}>
-                Again (0)
-              </button>
-              <button className="btn quality-btn q-hard" onClick={() => handleQuality(1)}>Hard (1)</button>
-              <button className={`btn quality-btn q-good ${isCorrect() ? 'suggested' : ''}`} onClick={() => handleQuality(2)}>
-                Good (2)
-              </button>
-              <button className="btn quality-btn q-easy" onClick={() => handleQuality(3)}>Easy (3)</button>
-            </div>
+          <div className="flashcard-back">
+            <span className="flashcard-label">{backLabel}</span>
+            <div className="flashcard-text">{back || '(no content)'}</div>
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="flashcard-actions mt-4">
+        <button className="btn flashcard-btn-practice" onClick={() => advance(0)}>
+          Needs Practice
+        </button>
+        <button className="btn flashcard-btn-got" onClick={() => advance(2)}>
+          Got It
+        </button>
       </div>
     </div>
   );

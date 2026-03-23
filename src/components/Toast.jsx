@@ -4,6 +4,12 @@ const ToastContext = createContext(null);
 
 let toastId = 0;
 
+const TOAST_ICONS = {
+  error: '\u2716',
+  success: '\u2714',
+  info: '\u2139',
+};
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
@@ -12,14 +18,20 @@ export function ToastProvider({ children }) {
     setToasts(prev => [...prev, { id, message, type }]);
     if (duration > 0) {
       setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
+        setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 200);
       }, duration);
     }
     return id;
   }, []);
 
   const removeToast = useCallback((id) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 200);
   }, []);
 
   const toast = useCallback({
@@ -28,7 +40,6 @@ export function ToastProvider({ children }) {
     info: (msg) => addToast(msg, 'info'),
   }, [addToast]);
 
-  // Patch window.confirm replacement not needed, but we override alert
   useEffect(() => {
     const origAlert = window.alert;
     window.alert = (msg) => addToast(String(msg), 'error');
@@ -39,13 +50,14 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
       {toasts.length > 0 && (
-        <div className="toast-container">
+        <div className="toast-container" role="alert" aria-live="polite">
           {toasts.map(t => (
             <div
               key={t.id}
-              className={`toast toast-${t.type}`}
+              className={`toast toast-${t.type} ${t.exiting ? 'toast-exit' : ''}`}
               onClick={() => removeToast(t.id)}
             >
+              <span className="toast-icon">{TOAST_ICONS[t.type]}</span>
               {t.message}
             </div>
           ))}

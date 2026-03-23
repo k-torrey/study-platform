@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getStudyTest, submitAnswer } from '../api';
 import { checkWrittenAnswer } from '../utils';
 
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
 export default function TestSession({ sectionId, onBack }) {
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -24,17 +26,27 @@ export default function TestSession({ sectionId, onBack }) {
     });
   }, [sectionId]);
 
-  if (loading) return <div className="empty-msg">Generating test...</div>;
+  if (loading) {
+    return (
+      <div className="study-session">
+        <div className="skeleton skeleton-block" />
+      </div>
+    );
+  }
+
   if (error) return (
     <div className="study-session">
       <p className="empty-msg">{error}</p>
-      <button className="btn" onClick={onBack}>Back to Study</button>
+      <div className="text-center">
+        <button className="btn" onClick={onBack}>Back to Study</button>
+      </div>
     </div>
   );
 
   if (done) {
     const correct = results.filter(r => r.correct).length;
     const missed = results.filter(r => !r.correct);
+    const scorePct = Math.round((correct / results.length) * 100);
 
     if (!submitted.current) {
       submitted.current = true;
@@ -49,8 +61,11 @@ export default function TestSession({ sectionId, onBack }) {
       <div className="study-session">
         <h2>Test Results</h2>
         <div className="test-score">
-          {correct} / {results.length} — {Math.round((correct / results.length) * 100)}%
+          {scorePct}%
         </div>
+        <p className="text-center text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+          {correct} of {results.length} correct
+        </p>
         {missed.length > 0 && (
           <div className="test-missed">
             <h3>Missed Terms</h3>
@@ -62,14 +77,15 @@ export default function TestSession({ sectionId, onBack }) {
             ))}
           </div>
         )}
-        <button className="btn btn-primary" onClick={onBack} style={{ marginTop: '16px' }}>
-          Back to Study
-        </button>
+        <div className="text-center mt-4">
+          <button className="btn btn-primary" onClick={onBack}>Back to Study</button>
+        </div>
       </div>
     );
   }
 
   const q = questions[currentIndex];
+  const progressPct = ((currentIndex + 1) / questions.length * 100).toFixed(0);
 
   const handleSubmit = () => {
     let correct = false;
@@ -126,6 +142,10 @@ export default function TestSession({ sectionId, onBack }) {
         </span>
       </div>
 
+      <div className="study-session-progress-bar">
+        <div className="study-session-progress-bar-fill" style={{ width: progressPct + '%' }} />
+      </div>
+
       <div className="study-card">
         {q.type === 'multiple_choice' && (
           <>
@@ -143,6 +163,7 @@ export default function TestSession({ sectionId, onBack }) {
                     onClick={() => !revealed && setSelectedAnswer(opt)}
                     disabled={revealed}
                   >
+                    <span className="test-option-letter">{LETTERS[i]}</span>
                     {opt}
                   </button>
                 );
@@ -177,7 +198,7 @@ export default function TestSession({ sectionId, onBack }) {
           <>
             <div className="study-card-prompt">
               <strong>{q.prompt}</strong>
-              <div style={{ marginTop: '8px' }}>{q.shown_definition}</div>
+              <div className="mt-2">{q.shown_definition}</div>
             </div>
             <div className="tf-buttons">
               <button

@@ -62,11 +62,11 @@ export default function ImageSearch({ term, onSelected, onClose }) {
         </p>
 
         {loading && results.length === 0 && (
-          <p className="empty-msg" style={{ padding: '16px' }}>Searching...</p>
+          <p className="empty-msg">Searching...</p>
         )}
 
         {!loading && results.length === 0 && (
-          <p className="empty-msg" style={{ padding: '16px' }}>No images found. Try different search terms.</p>
+          <p className="empty-msg">No images found. Try different search terms.</p>
         )}
 
         <div className="image-search-grid">

@@ -15,12 +15,26 @@ const TABS = [
 export default function SectionPage({ sectionId, sectionName, courseId, onBack }) {
   const [activeTab, setActiveTab] = useState('terms');
   const [textbookSearchQuery, setTextbookSearchQuery] = useState('');
-  const [activeTerm, setActiveTerm] = useState(null); // { id, term } when searching from a term
+  const [activeTerm, setActiveTerm] = useState(null);
+  const [returnToTermId, setReturnToTermId] = useState(null);
 
   function handleFindInTextbook(termId, termName) {
     setActiveTerm({ id: termId, term: termName });
+    setReturnToTermId(termId);
     setTextbookSearchQuery(termName);
     setActiveTab('textbook');
+  }
+
+  function handleReturnToTerms() {
+    setActiveTab('terms');
+    setActiveTerm(null);
+    // Scroll to the term after tab switch renders
+    if (returnToTermId) {
+      setTimeout(() => {
+        const el = document.getElementById(`term-${returnToTermId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
   }
 
   return (
@@ -35,14 +49,24 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
       }} />
 
       {activeTab === 'textbook' && (
-        <TextbookTab
-          sectionId={sectionId}
-          courseId={courseId}
-          initialQuery={textbookSearchQuery}
-          onQueryConsumed={() => setTextbookSearchQuery('')}
-          activeTerm={activeTerm}
-          onDefinitionSet={() => setActiveTerm(null)}
-        />
+        <>
+          {returnToTermId && (
+            <button className="btn btn-back-to-terms mb-4" onClick={handleReturnToTerms}>
+              &larr; Back to Terms
+            </button>
+          )}
+          <TextbookTab
+            sectionId={sectionId}
+            courseId={courseId}
+            initialQuery={textbookSearchQuery}
+            onQueryConsumed={() => setTextbookSearchQuery('')}
+            activeTerm={activeTerm}
+            onDefinitionSet={() => {
+              setActiveTerm(null);
+              handleReturnToTerms();
+            }}
+          />
+        </>
       )}
       {activeTab === 'terms' && (
         <TermsTab sectionId={sectionId} courseId={courseId} onFindInTextbook={handleFindInTextbook} />

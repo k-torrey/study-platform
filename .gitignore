@@ -10,3 +10,5 @@ server/uploads/
 
 .playwright-mcp/
 supabase/.temp/
+
+.vercel

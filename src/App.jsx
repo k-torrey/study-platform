@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './auth';
 import AuthPage from './components/AuthPage';
 import Breadcrumb from './components/Breadcrumb';
@@ -6,31 +6,58 @@ import HomePage from './components/HomePage';
 import CoursePage from './components/CoursePage';
 import ExamPage from './components/ExamPage';
 import SectionPage from './components/SectionPage';
+import ThemeToggle from './components/ThemeToggle';
+
+const INITIAL_NAV = { view: 'home' };
 
 export default function App() {
   const { user, loading, signOut, recoveryMode } = useAuth();
 
-  const [nav, setNav] = useState({ view: 'home' });
+  const [nav, setNav] = useState(INITIAL_NAV);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
+  // Sync navigation with browser history
+  const navigate = useCallback((newNav) => {
+    setNav(newNav);
+    window.history.pushState(newNav, '', '');
+  }, []);
+
+  useEffect(() => {
+    // Replace current history entry with initial state
+    window.history.replaceState(INITIAL_NAV, '', '');
+
+    const handlePopState = (e) => {
+      if (e.state) {
+        setNav(e.state);
+      } else {
+        setNav(INITIAL_NAV);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   if (loading) {
     return (
       <div className="app">
-        <div className="app-loading">Loading...</div>
+        <div className="app-loading">
+          <div className="app-loading-spinner" />
+          Loading...
+        </div>
       </div>
     );
   }
 
-  // Show password reset form even if user has a session from the recovery token
   if (!user || recoveryMode) {
     return <AuthPage />;
   }
 
-  const goHome = () => setNav({ view: 'home' });
-  const goCourse = (courseId, courseName) => setNav({ view: 'course', courseId, courseName });
-  const goExam = (examId, examName) => setNav({ ...nav, view: 'exam', examId, examName });
-  const goSection = (sectionId, sectionName) => setNav({ ...nav, view: 'section', sectionId, sectionName });
+  const goHome = () => navigate({ view: 'home' });
+  const goCourse = (courseId, courseName) => navigate({ view: 'course', courseId, courseName });
+  const goExam = (examId, examName) => navigate({ ...nav, view: 'exam', examId, examName });
+  const goSection = (sectionId, sectionName) => navigate({ ...nav, view: 'section', sectionId, sectionName });
 
   const crumbs = [{ label: 'Courses', onClick: goHome }];
   if (nav.view !== 'home') {
@@ -46,9 +73,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 onClick={goHome} style={{ cursor: 'pointer' }}>Study</h1>
+        <h1 onClick={goHome}>Study</h1>
         <div className="header-right">
           <span className="header-email">{user.email}</span>
+          <ThemeToggle />
           <button className="btn btn-ghost btn-sm" onClick={signOut}>Sign out</button>
         </div>
       </header>

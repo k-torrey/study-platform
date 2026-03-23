@@ -24,11 +24,11 @@ export default function StudyLauncher({ sectionId, progress, onSelectMode, onPro
     <div className="study-launcher">
       <h2>Study</h2>
 
-      <div className="study-progress-bar">
-        {mastered > 0 && <div className="sp-seg sp-mastered" style={{ width: pct(mastered) + '%' }} />}
-        {reviewing > 0 && <div className="sp-seg sp-reviewing" style={{ width: pct(reviewing) + '%' }} />}
-        {learning > 0 && <div className="sp-seg sp-learning" style={{ width: pct(learning) + '%' }} />}
-        {unseen > 0 && <div className="sp-seg sp-unseen" style={{ width: pct(unseen) + '%' }} />}
+      <div className="study-progress-bar" aria-label="Study progress">
+        {mastered > 0 && <div className="sp-seg sp-mastered" style={{ width: pct(mastered) + '%' }} title={`${mastered} mastered`} />}
+        {reviewing > 0 && <div className="sp-seg sp-reviewing" style={{ width: pct(reviewing) + '%' }} title={`${reviewing} reviewing`} />}
+        {learning > 0 && <div className="sp-seg sp-learning" style={{ width: pct(learning) + '%' }} title={`${learning} learning`} />}
+        {unseen > 0 && <div className="sp-seg sp-unseen" style={{ width: pct(unseen) + '%' }} title={`${unseen} unseen`} />}
       </div>
       <div className="study-stats">
         <span className="stat-mastered">{mastered} mastered</span>
@@ -42,21 +42,25 @@ export default function StudyLauncher({ sectionId, progress, onSelectMode, onPro
 
       <div className="study-modes">
         <button className="study-mode-card" onClick={() => onSelectMode('flashcard')}>
+          <div className="smc-icon smc-icon-flashcard">&#x1F4C7;</div>
           <div className="smc-title">Flashcards</div>
           <div className="smc-desc">Review due terms with spaced repetition</div>
           {due_count > 0 && <span className="badge badge-due">{due_count} due</span>}
         </button>
         <button className="study-mode-card" onClick={() => onSelectMode('learn')}>
+          <div className="smc-icon smc-icon-learn">&#x1F9E0;</div>
           <div className="smc-title">Learn</div>
           <div className="smc-desc">Learn 7 new terms at a time</div>
           {unseen > 0 && <span className="badge badge-unseen">{unseen} unseen</span>}
         </button>
         <button className="study-mode-card" onClick={() => onSelectMode('test')}>
+          <div className="smc-icon smc-icon-test">&#x270F;</div>
           <div className="smc-title">Test</div>
           <div className="smc-desc">Mixed question quiz (MC, written, T/F)</div>
           <span className="badge">{total} terms</span>
         </button>
         <button className="study-mode-card" onClick={() => setShowTable(!showTable)}>
+          <div className="smc-icon smc-icon-progress">&#x1F4CA;</div>
           <div className="smc-title">View Progress</div>
           <div className="smc-desc">See detailed progress for each term</div>
         </button>
@@ -108,15 +112,15 @@ export default function StudyLauncher({ sectionId, progress, onSelectMode, onPro
               })}
             </tbody>
           </table>
-          <div style={{ marginTop: '12px' }}>
+          <div className="mt-3">
             {!confirming ? (
               <button className="btn btn-danger btn-sm" onClick={() => setConfirming(true)}>
                 Reset Progress
               </button>
             ) : (
-              <span>
-                Are you sure?{' '}
-                <button className="btn btn-danger btn-sm" onClick={handleReset}>Yes, reset all</button>{' '}
+              <span className="flex-row">
+                <span>Are you sure?</span>
+                <button className="btn btn-danger btn-sm" onClick={handleReset}>Yes, reset all</button>
                 <button className="btn btn-sm" onClick={() => setConfirming(false)}>Cancel</button>
               </span>
             )}

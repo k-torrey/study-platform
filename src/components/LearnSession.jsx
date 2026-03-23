@@ -89,7 +89,13 @@ export default function LearnSession({ sectionId, onBack }) {
     if (e.key === 'Enter' && !revealed) handleCheck();
   };
 
-  if (loading) return <div className="empty-msg">Loading terms...</div>;
+  if (loading) {
+    return (
+      <div className="study-session">
+        <div className="skeleton skeleton-block" />
+      </div>
+    );
+  }
 
   if (phase === 'done') {
     return (
@@ -101,7 +107,7 @@ export default function LearnSession({ sectionId, onBack }) {
             : 'No unseen terms remaining. Great job!'
           }
         </p>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+        <div className="flex-center gap-2 mt-4">
           {hasMore && (
             <button className="btn btn-primary" onClick={loadBatch}>Next Batch</button>
           )}
@@ -113,28 +119,33 @@ export default function LearnSession({ sectionId, onBack }) {
 
   if (phase === 'intro') {
     const card = batch[introIndex];
+    const progressPct = ((introIndex + 1) / batch.length * 100).toFixed(0);
     return (
       <div className="study-session">
         <div className="study-session-header">
           <button className="btn btn-ghost" onClick={onBack}>&larr; Back</button>
           <span className="study-progress-text">Preview {introIndex + 1} of {batch.length}</span>
         </div>
+        <div className="study-session-progress-bar">
+          <div className="study-session-progress-bar-fill" style={{ width: progressPct + '%' }} />
+        </div>
         <div className="study-card">
           <div className="study-card-term">{card.term}</div>
           <div className="study-card-definition">{card.definition}</div>
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: '16px' }}
-            onClick={() => {
-              if (introIndex + 1 >= batch.length) {
-                startDrill();
-              } else {
-                setIntroIndex(introIndex + 1);
-              }
-            }}
-          >
-            {introIndex + 1 >= batch.length ? 'Start Drill' : 'Next'}
-          </button>
+          <div className="mt-4">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (introIndex + 1 >= batch.length) {
+                  startDrill();
+                } else {
+                  setIntroIndex(introIndex + 1);
+                }
+              }}
+            >
+              {introIndex + 1 >= batch.length ? 'Start Drill' : 'Next'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -167,7 +178,7 @@ export default function LearnSession({ sectionId, onBack }) {
               placeholder="Type the term..."
               autoFocus
             />
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex-row">
               <button className="btn btn-primary" onClick={handleCheck}>Check</button>
               <button className="btn" onClick={() => setRevealed(true)}>Skip</button>
             </div>
@@ -178,13 +189,11 @@ export default function LearnSession({ sectionId, onBack }) {
               <div>Your answer: {userInput || '(blank)'}</div>
               {!isCorrect && <div>Correct answer: {current.term}</div>}
             </div>
-            <button
-              className="btn btn-primary"
-              style={{ marginTop: '12px' }}
-              onClick={() => processAnswer(isCorrect)}
-            >
-              Continue
-            </button>
+            <div className="mt-3">
+              <button className="btn btn-primary" onClick={() => processAnswer(isCorrect)}>
+                Continue
+              </button>
+            </div>
           </div>
         )}
       </div>

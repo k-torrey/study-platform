@@ -21,7 +21,6 @@ export default function TextbookManager({ courseId }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['pdf', 'epub'].includes(ext)) {
       alert('Only PDF and EPUB files are supported.');
@@ -61,7 +60,7 @@ export default function TextbookManager({ courseId }) {
   }
 
   return (
-    <div className="textbook-manager" style={{ marginBottom: '24px' }}>
+    <div className="textbook-manager">
       <h2>Textbooks</h2>
 
       <div className="textbook-list">
@@ -75,12 +74,12 @@ export default function TextbookManager({ courseId }) {
           </div>
         ))}
         {textbooks.length === 0 && (
-          <p className="empty-msg" style={{ padding: '12px' }}>No textbooks yet. Upload a PDF/EPUB or paste text.</p>
+          <p className="empty-msg">No textbooks yet. Upload a PDF/EPUB or paste text.</p>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <label className="btn btn-primary" style={{ cursor: 'pointer' }}>
+      <div className="flex-row">
+        <label className="btn btn-primary">
           {uploading ? 'Uploading...' : 'Upload PDF/EPUB'}
           <input type="file" accept=".pdf,.epub" onChange={handleUpload} hidden disabled={uploading} />
         </label>

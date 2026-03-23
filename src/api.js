@@ -149,6 +149,54 @@ export async function autoFillDefinition(termId, termName, courseId) {
   return data.definition || null;
 }
 
+export async function batchAutoFillDefinitions(sectionId, courseId, onProgress) {
+  // Get terms that need definitions
+  const allTerms = await getTerms(sectionId);
+  const needsDef = allTerms.filter(t => !t.definition || !t.definition.trim());
+
+  if (needsDef.length === 0) return { filled: 0, total: 0 };
+
+  const BATCH = 3;
+  let totalFilled = 0;
+
+  for (let i = 0; i < needsDef.length; i += BATCH) {
+    const batch = needsDef.slice(i, i + BATCH).map(t => ({ id: t.id, term: t.term }));
+
+    if (onProgress) onProgress(i, needsDef.length, totalFilled);
+
+    const res = await fetch('/api/terms/batch-definitions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ terms: batch, courseId }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      totalFilled += data.filled || 0;
+    } else if (res.status === 429) {
+      // Rate limited — wait 30s and retry this batch
+      await new Promise(r => setTimeout(r, 30000));
+      const retry = await fetch('/api/terms/batch-definitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ terms: batch, courseId }),
+      });
+      if (retry.ok) {
+        const data = await retry.json();
+        totalFilled += data.filled || 0;
+      }
+    }
+
+    // Small delay between batches
+    if (i + BATCH < needsDef.length) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
+  if (onProgress) onProgress(needsDef.length, needsDef.length, totalFilled);
+  return { filled: totalFilled, total: needsDef.length };
+}
+
 export async function deleteTerm(id) {
   // Delete associated image from storage if exists
   const { data: term } = await supabase.from('terms').select('image_url').eq('id', id).single();
@@ -536,7 +584,19 @@ export async function uploadTextbook(courseId, file) {
     throw new Error(err.error || 'Processing failed');
   }
 
-  return res.json();
+  const result = await res.json();
+
+  // Trigger embedding generation in the background (non-blocking)
+  fetch('/api/textbooks/embed', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ textbookId: textbook.id }),
+  }).catch(() => {}); // Fire-and-forget
+
+  return result;
 }
 
 export async function pasteTextbook(courseId, { title, content }) {
@@ -597,6 +657,18 @@ export async function searchTextbook(id, query) {
       query,
     })
   );
+}
+
+export async function semanticSearchTextbook(textbookId, query) {
+  const res = await fetch('/api/search/semantic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, textbookId }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data.fallback) return null; // Signal caller to fall back to FTS
+  return data.results || [];
 }
 
 // ─── Textbook Links ──────────────────────────────────────────

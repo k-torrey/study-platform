@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getTextbooks, searchTextbook, getChapterContent, getSectionLinks, createSectionLink, deleteSectionLink, updateTerm } from '../api';
+import { getTextbooks, searchTextbook, semanticSearchTextbook, getChapterContent, getSectionLinks, createSectionLink, deleteSectionLink, updateTerm } from '../api';
 
 function SafeSnippet({ html }) {
   const safe = (html || '').replace(/<(?!\/?mark\b)[^>]*>/gi, '');
@@ -8,8 +8,17 @@ function SafeSnippet({ html }) {
 
 function highlightTerm(text, term) {
   if (!term) return text;
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escaped})`, 'gi');
+
+  // Build a pattern that matches the full phrase OR any individual word (3+ chars)
+  const words = term.split(/\s+/).filter(w => w.length >= 3);
+  const fullEscaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const wordPatterns = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  // Full phrase first, then individual words — longest match wins
+  const allPatterns = [fullEscaped, ...wordPatterns.filter(w => w !== fullEscaped)];
+  const combined = allPatterns.join('|');
+
+  const regex = new RegExp(`(${combined})`, 'gi');
   return text.replace(regex, '<mark>$1</mark>');
 }
 
@@ -23,14 +32,12 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
   const timerRef = useRef(null);
   const initialQueryHandled = useRef(false);
 
-  // Reader panel state
   const [readerOpen, setReaderOpen] = useState(false);
   const [readerChapter, setReaderChapter] = useState(null);
   const [readerLoading, setReaderLoading] = useState(false);
   const [readerSearchTerm, setReaderSearchTerm] = useState('');
   const readerContentRef = useRef(null);
 
-  // Feedback
   const [successMsg, setSuccessMsg] = useState('');
   const [linkedChapterIds, setLinkedChapterIds] = useState(new Set());
 
@@ -68,8 +75,14 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
     timerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await searchTextbook(selectedTb, q.trim());
-        setResults(res);
+        // Try semantic search first, fall back to FTS
+        const semanticResults = await semanticSearchTextbook(selectedTb, q.trim());
+        if (semanticResults && semanticResults.length > 0) {
+          setResults(semanticResults);
+        } else {
+          const ftsResults = await searchTextbook(selectedTb, q.trim());
+          setResults(ftsResults);
+        }
       } catch {
         setResults([]);
       }
@@ -84,12 +97,15 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
     try {
       const chapter = await getChapterContent(chapterId);
       setReaderChapter(chapter);
-      setTimeout(() => {
+      // Scroll to first highlight after render
+      const scrollToMark = () => {
         if (readerContentRef.current) {
           const mark = readerContentRef.current.querySelector('mark');
           if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 100);
+      };
+      setTimeout(scrollToMark, 150);
+      setTimeout(scrollToMark, 500); // retry in case content was still rendering
     } catch {
       setReaderChapter(null);
     }
@@ -155,7 +171,6 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
   return (
     <div className={`textbook-tab ${readerOpen ? 'textbook-tab-with-reader' : ''}`}>
       <div className="textbook-main">
-        {/* Active term banner */}
         {activeTerm && (
           <div className="textbook-term-banner">
             Finding definition for: <strong>{activeTerm.term}</strong>
@@ -163,15 +178,13 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
           </div>
         )}
 
-        {/* Success feedback */}
         {successMsg && (
           <div className="textbook-success">{successMsg}</div>
         )}
 
-        {/* Linked passages */}
         {links.length > 0 && (
-          <div style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Linked Passages</h3>
+          <div className="mb-6">
+            <h3 className="text-sm mb-3" style={{ fontWeight: 600 }}>Linked Passages</h3>
             <div className="linked-passages">
               {links.map(l => (
                 <div key={l.id} className="linked-passage">
@@ -187,10 +200,9 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
           </div>
         )}
 
-        {/* Search */}
         {textbooks.length > 0 ? (
           <>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Search Textbooks</h3>
+            <h3 className="text-sm mb-3" style={{ fontWeight: 600 }}>Search Textbooks</h3>
             {textbooks.length > 1 && (
               <div className="form-group">
                 <select value={selectedTb || ''} onChange={e => { setSelectedTb(Number(e.target.value)); setResults([]); setQuery(''); }}>
@@ -210,20 +222,20 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
               />
             </div>
 
-            {searching && <p className="empty-msg" style={{ padding: '8px' }}>Searching...</p>}
+            {searching && <p className="empty-msg">Searching...</p>}
 
             {results.length > 0 && (
               <div className="search-results">
                 {results.map(r => {
                   const linked = isAlreadyLinked(r.id);
                   return (
-                    <div key={r.id} className={`search-result-item ${linked ? 'search-result-linked' : ''}`} onClick={() => openReader(r.id, query)} style={{ cursor: 'pointer' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={r.id} className={`search-result-item ${linked ? 'search-result-linked' : ''}`} onClick={() => openReader(r.id, query)}>
+                      <div className="flex-between">
                         <h4>Ch. {r.chapter_number}: {r.title}</h4>
                         {linked && <span className="linked-badge">Linked</span>}
                       </div>
                       <p><SafeSnippet html={r.snippet || ''} /></p>
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <div className="flex-row-wrap mt-2">
                         {activeTerm && (
                           <button
                             className="btn btn-sm btn-primary"
@@ -258,13 +270,17 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
           </>
         ) : (
           <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+            </div>
             <h2>No textbooks available</h2>
             <p>Upload a textbook from the course page to enable search.</p>
           </div>
         )}
       </div>
 
-      {/* Reader side panel */}
       {readerOpen && (
         <div className="reader-panel">
           <div className="reader-header">
@@ -292,12 +308,11 @@ export default function TextbookTab({ sectionId, courseId, initialQuery, onQuery
           </div>
           {readerChapter && (
             <div className="reader-footer">
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div className="flex-row-wrap">
                 {activeTerm && (
                   <button
                     className="btn btn-sm btn-primary"
                     onClick={() => {
-                      // Use visible highlighted text as definition
                       const sel = window.getSelection();
                       if (sel && sel.toString().trim()) {
                         handleUseAsDefinition(sel.toString());
