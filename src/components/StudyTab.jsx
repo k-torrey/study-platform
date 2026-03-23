@@ -4,6 +4,7 @@ import StudyLauncher from './StudyLauncher';
 import FlashcardSession from './FlashcardSession';
 import LearnSession from './LearnSession';
 import TestSession from './TestSession';
+import DiagramQuiz from './DiagramQuiz';
 
 export default function StudyTab({ sectionId }) {
   const [subMode, setSubMode] = useState('launcher');
@@ -32,6 +33,9 @@ export default function StudyTab({ sectionId }) {
   }
   if (subMode === 'test') {
     return <TestSession sectionId={sectionId} onBack={handleBack} />;
+  }
+  if (subMode === 'diagrams') {
+    return <DiagramQuiz sectionId={sectionId} onBack={handleBack} />;
   }
 
   return (

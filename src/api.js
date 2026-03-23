@@ -694,6 +694,52 @@ export async function deleteSectionLink(id) {
   );
 }
 
+// ─── Diagrams ───────────────────────────────────────────────
+
+export async function fetchImageSource(url, courseId) {
+  const res = await fetch('/api/diagrams/fetch-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, courseId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed' }));
+    throw new Error(err.error || 'Failed to fetch image source');
+  }
+  return res.json();
+}
+
+export async function matchDiagramsToTerms(courseId, sectionId) {
+  const res = await fetch('/api/diagrams/match-terms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ courseId, sectionId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed' }));
+    throw new Error(err.error || 'Failed to match diagrams');
+  }
+  return res.json();
+}
+
+export async function getCourseImages(courseId) {
+  return unwrap(
+    await supabase.from('course_images')
+      .select('id, image_url, caption, source_url, created_at')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: false })
+  );
+}
+
+export async function deleteCourseImages(courseId, sourceUrl) {
+  return unwrap(
+    await supabase.from('course_images')
+      .delete()
+      .eq('course_id', courseId)
+      .eq('source_url', sourceUrl)
+  );
+}
+
 // ─── Chat ───────────────────────────────────────────────────
 
 export async function askChatbot(question, courseId, history = []) {

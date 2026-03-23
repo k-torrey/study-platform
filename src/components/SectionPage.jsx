@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import TabBar from './TabBar';
 import TextbookTab from './TextbookTab';
 import TermsTab from './TermsTab';
+import DiagramsTab from './DiagramsTab';
 import StudyTab from './StudyTab';
 import NotesTab from './NotesTab';
 import ChatTab from './ChatTab';
@@ -9,6 +10,7 @@ import ChatTab from './ChatTab';
 const TABS = [
   { key: 'textbook', label: 'Textbook' },
   { key: 'terms', label: 'Terms' },
+  { key: 'diagrams', label: 'Diagrams' },
   { key: 'study', label: 'Study' },
   { key: 'notes', label: 'Notes' },
   { key: 'ask', label: 'Ask' },
@@ -71,6 +73,9 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
       )}
       {activeTab === 'terms' && (
         <TermsTab sectionId={sectionId} courseId={courseId} onFindInTextbook={handleFindInTextbook} />
+      )}
+      {activeTab === 'diagrams' && (
+        <DiagramsTab sectionId={sectionId} courseId={courseId} />
       )}
       {activeTab === 'study' && (
         <StudyTab sectionId={sectionId} />

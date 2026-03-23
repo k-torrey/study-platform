@@ -59,6 +59,11 @@ export default function StudyLauncher({ sectionId, progress, onSelectMode, onPro
           <div className="smc-desc">Mixed question quiz (MC, written, T/F)</div>
           <span className="badge">{total} terms</span>
         </button>
+        <button className="study-mode-card" onClick={() => onSelectMode('diagrams')}>
+          <div className="smc-icon smc-icon-diagrams">&#x1F5BC;</div>
+          <div className="smc-title">Diagram Quiz</div>
+          <div className="smc-desc">Visual study — see term, reveal the diagram</div>
+        </button>
         <button className="study-mode-card" onClick={() => setShowTable(!showTable)}>
           <div className="smc-icon smc-icon-progress">&#x1F4CA;</div>
           <div className="smc-title">View Progress</div>
