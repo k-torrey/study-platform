@@ -1753,6 +1753,27 @@ textarea { resize: vertical; }
   color: #fff;
 }
 
+/* Inline citation links */
+.cite-link {
+  display: inline;
+  background: var(--accent-light);
+  color: var(--accent);
+  border: none;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+  vertical-align: super;
+  line-height: 1;
+  transition: all var(--transition);
+}
+
+.cite-link:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* Typing indicator */
 .chat-typing {
   display: flex;

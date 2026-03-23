@@ -129,12 +129,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // Step 2: Build context for Claude
-    const context = passages.slice(0, 6).join('\n\n---\n\n');
-    const sourceList = uniqueSources
-      .slice(0, 5)
-      .map(s => `Ch. ${s.chapter_number}: ${s.title}`)
-      .join(', ');
+    // Step 2: Build context for Claude with numbered sources
+    const topSources = uniqueSources.slice(0, 5);
+    const numberedPassages = passages.slice(0, topSources.length).map((p, i) =>
+      `[Source ${i + 1}: Ch. ${topSources[i].chapter_number} — ${topSources[i].title}]\n${p}`
+    ).join('\n\n---\n\n');
+    const context = numberedPassages;
 
     // Build conversation history for multi-turn
     const messages = [];
@@ -149,16 +149,17 @@ export default async function handler(req, res) {
 
     // Step 3: Call Claude
     const systemPrompt = context
-      ? `You are a knowledgeable anatomy and biology tutor helping a college student study. You have access to their textbook content below. Answer questions conversationally, clearly, and accurately based on this textbook content.
+      ? `You are a knowledgeable anatomy and biology tutor helping a college student study. You have access to their textbook passages below, each labeled with a source number [1], [2], etc.
 
 Rules:
 - Explain concepts in a friendly, easy-to-understand way — like a helpful tutor, not a textbook
 - Use the textbook passages as your source of truth
 - Bold important terms using **term**
-- If the textbook content doesn't contain enough information to answer, say so honestly: "I couldn't find specific information about that in your textbook, but here's what I can share..." and give a brief general answer if possible
-- At the end of your response, on a new line, write "Sources: ${sourceList}" so the student knows where to look
+- IMPORTANT: Add inline citations using [1], [2], [3] etc. after each fact or sentence to show which source it came from. Place the citation number right after the relevant sentence.
+- If the textbook content doesn't contain enough information to answer, say so honestly: "I couldn't find specific information about that in your textbook."
 - Keep answers concise but thorough — 2-4 paragraphs max
 - If the student asks a follow-up, use the conversation context
+- Do NOT add a separate "Sources:" line at the end — the inline citations are enough
 
 Textbook passages:
 ${context}`

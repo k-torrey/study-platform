@@ -1,12 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askChatbot, getChapterContent } from '../api';
 
-function highlightTerms(text, terms) {
-  if (!terms || terms.length === 0) return text;
-  const words = terms.split(/\s+/).filter(w => w.length >= 3);
-  const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  if (!pattern) return text;
-  return text.replace(new RegExp(`(${pattern})`, 'gi'), '<mark>$1</mark>');
+const STOP_WORDS = new Set([
+  'what','where','which','when','how','why','who','whom','does','doing',
+  'the','a','an','is','are','was','were','be','been','being',
+  'have','has','had','do','did','will','would','shall','should',
+  'may','might','must','can','could','about','above','after','again',
+  'all','also','and','any','because','before','between','both','but',
+  'by','for','from','get','got','if','in','into','its','just',
+  'more','most','not','of','on','or','other','out','over','own',
+  'same','so','some','such','than','that','their','them','then',
+  'there','these','they','this','those','through','to','too','under',
+  'up','very','with','you','your','me','my','our','we','us',
+  'tell','explain','describe','define','list','name','give','make',
+  'know','think','mean','called','many','much','like','does',
+]);
+
+function extractKeyTerms(question) {
+  return question
+    .replace(/[?.,!'"]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !STOP_WORDS.has(w.toLowerCase()));
+}
+
+function highlightTerms(text, question) {
+  if (!question) return text;
+  const keywords = extractKeyTerms(question);
+  if (keywords.length === 0) return text;
+
+  // Try full multi-word phrase first, then individual keywords
+  const fullPhrase = keywords.join(' ');
+  const escapedPhrase = fullPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedWords = keywords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  const patterns = [escapedPhrase, ...escapedWords].filter(Boolean);
+  const combined = patterns.join('|');
+
+  return text.replace(new RegExp(`(${combined})`, 'gi'), '<mark>$1</mark>');
 }
 
 function renderChapterContent(content, searchTerms) {
@@ -22,18 +52,34 @@ function renderChapterContent(content, searchTerms) {
     .join('');
 }
 
-function MessageContent({ text }) {
-  // Simple markdown: **bold**, *italic*, newlines, and source lines
-  const html = text
+function MessageContent({ text, onCiteClick }) {
+  // Simple markdown + clickable citation links
+  let html = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^Sources?:(.+)$/gm, '<div class="chat-sources-line">Sources:$1</div>')
+    .replace(/^Sources?:(.+)$/gm, '') // Remove trailing source lines (inline citations replace them)
     .replace(/\n/g, '<br/>');
 
-  return <div className="chat-message-text" dangerouslySetInnerHTML={{ __html: html }} />;
+  // Replace [1], [2], etc. with clickable citation badges
+  html = html.replace(/\[(\d+)\]/g, '<button class="cite-link" data-cite="$1">[$1]</button>');
+
+  function handleClick(e) {
+    const cite = e.target.dataset?.cite;
+    if (cite && onCiteClick) {
+      onCiteClick(parseInt(cite, 10));
+    }
+  }
+
+  return (
+    <div
+      className="chat-message-text"
+      dangerouslySetInnerHTML={{ __html: html }}
+      onClick={handleClick}
+    />
+  );
 }
 
 export default function ChatTab({ courseId }) {
@@ -139,7 +185,15 @@ export default function ChatTab({ courseId }) {
                 {msg.role === 'user' ? '👤' : '🤖'}
               </div>
               <div className="chat-message-body">
-                <MessageContent text={msg.content} />
+                <MessageContent
+                  text={msg.content}
+                  onCiteClick={(num) => {
+                    const srcs = sourcesMap[i];
+                    if (srcs && srcs[num - 1]) {
+                      openReader(srcs[num - 1].chapter_id, getQuestionForMsg(i));
+                    }
+                  }}
+                />
                 {sourcesMap[i] && (
                   <div className="chat-source-links">
                     {sourcesMap[i].map((s, j) => (
@@ -148,7 +202,7 @@ export default function ChatTab({ courseId }) {
                         className="btn btn-sm chat-source-btn"
                         onClick={() => openReader(s.chapter_id, getQuestionForMsg(i))}
                       >
-                        Ch. {s.chapter_number}: {s.title}
+                        [{j + 1}] Ch. {s.chapter_number}: {s.title}
                       </button>
                     ))}
                   </div>
