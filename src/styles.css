@@ -1803,6 +1803,13 @@ textarea { resize: vertical; }
 
 .diagram-add-url input { flex: 1; min-width: 200px; }
 
+.diagram-add-divider {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin: var(--space-2) 0;
+}
+
 .diagram-source-list {
   display: flex;
   flex-direction: column;

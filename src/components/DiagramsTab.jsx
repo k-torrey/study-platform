@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getTerms, getCourseImages, fetchImageSource, matchDiagramsToTerms, deleteCourseImages } from '../api';
+import { getTerms, getCourseImages, fetchImageSource, uploadImageSource, matchDiagramsToTerms, deleteCourseImages } from '../api';
 import ImageSearch from './ImageSearch';
 
 export default function DiagramsTab({ sectionId, courseId }) {
   const [terms, setTerms] = useState(null);
   const [sources, setSources] = useState([]);
-  const [showAddUrl, setShowAddUrl] = useState(false);
+  const [showAddSource, setShowAddSource] = useState(false);
   const [url, setUrl] = useState('');
   const [fetching, setFetching] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [matching, setMatching] = useState(false);
   const [message, setMessage] = useState('');
   const [imageSearchTerm, setImageSearchTerm] = useState(null);
@@ -44,12 +45,40 @@ export default function DiagramsTab({ sectionId, courseId }) {
       const result = await fetchImageSource(url.trim(), courseId);
       showMsg(`Found ${result.count} new images (${result.skipped || 0} already saved)`);
       setUrl('');
-      setShowAddUrl(false);
+      setShowAddSource(false);
       loadData();
     } catch (err) {
       showMsg('Error: ' + err.message);
     }
     setFetching(false);
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|gif|webp|svg|pdf)$/i)) {
+      showMsg('Supported: images (JPG, PNG, GIF, WebP, SVG) and PDF files.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      showMsg('File must be under 20MB.');
+      return;
+    }
+
+    setUploading(true);
+    setMessage('');
+    try {
+      const result = await uploadImageSource(file, courseId);
+      showMsg(`Uploaded! ${result.count} image${result.count !== 1 ? 's' : ''} added${result.figures ? ` (${result.figures} figures found in PDF)` : ''}.`);
+      setShowAddSource(false);
+      loadData();
+    } catch (err) {
+      showMsg('Error: ' + err.message);
+    }
+    setUploading(false);
+    e.target.value = '';
   }
 
   async function handleMatch() {
@@ -88,26 +117,39 @@ export default function DiagramsTab({ sectionId, courseId }) {
       <div className="diagram-sources mb-6">
         <div className="flex-between mb-3">
           <h3 className="text-sm" style={{ fontWeight: 600 }}>Image Sources</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAddUrl(!showAddUrl)}>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAddSource(!showAddSource)}>
             + Add Source
           </button>
         </div>
 
-        {showAddUrl && (
-          <form className="diagram-add-url mb-3" onSubmit={handleFetchUrl}>
-            <input
-              type="url"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="Paste URL (e.g., OpenStax chapter page)..."
-              required
-              autoFocus
-            />
-            <button className="btn btn-primary" type="submit" disabled={fetching}>
-              {fetching ? 'Scanning...' : 'Scan for Images'}
-            </button>
-            <button className="btn" type="button" onClick={() => setShowAddUrl(false)}>Cancel</button>
-          </form>
+        {showAddSource && (
+          <div className="diagram-add-source mb-3">
+            <form className="diagram-add-url mb-2" onSubmit={handleFetchUrl}>
+              <input
+                type="url"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder="Paste URL (e.g., OpenStax chapter page)..."
+              />
+              <button className="btn btn-primary" type="submit" disabled={fetching || !url.trim()}>
+                {fetching ? 'Scanning...' : 'Scan URL'}
+              </button>
+            </form>
+            <div className="diagram-add-divider">or</div>
+            <div className="flex-row">
+              <label className="btn">
+                {uploading ? 'Uploading...' : 'Upload File (Image or PDF)'}
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.pdf"
+                  onChange={handleFileUpload}
+                  hidden
+                  disabled={uploading}
+                />
+              </label>
+              <button className="btn" onClick={() => setShowAddSource(false)}>Cancel</button>
+            </div>
+          </div>
         )}
 
         {sources.length > 0 ? (

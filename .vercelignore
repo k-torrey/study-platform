@@ -1,0 +1,6 @@
+*.pdf
+*.png
+*.db
+.playwright-mcp
+scripts
+client

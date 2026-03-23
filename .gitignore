@@ -12,3 +12,4 @@ server/uploads/
 supabase/.temp/
 
 .vercel
+*.png

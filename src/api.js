@@ -722,6 +722,25 @@ export async function matchDiagramsToTerms(courseId, sectionId) {
   return res.json();
 }
 
+export async function uploadImageSource(file, courseId) {
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = btoa(
+    new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  );
+
+  const res = await fetch('/api/diagrams/upload-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileBase64: base64, fileName: file.name, courseId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed' }));
+    throw new Error(err.error || 'Failed to upload image source');
+  }
+  return res.json();
+}
+
 export async function getCourseImages(courseId) {
   return unwrap(
     await supabase.from('course_images')
