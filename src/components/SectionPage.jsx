@@ -4,12 +4,14 @@ import TextbookTab from './TextbookTab';
 import TermsTab from './TermsTab';
 import StudyTab from './StudyTab';
 import NotesTab from './NotesTab';
+import ChatTab from './ChatTab';
 
 const TABS = [
   { key: 'textbook', label: 'Textbook' },
   { key: 'terms', label: 'Terms' },
   { key: 'study', label: 'Study' },
   { key: 'notes', label: 'Notes' },
+  { key: 'ask', label: 'Ask' },
 ];
 
 export default function SectionPage({ sectionId, sectionName, courseId, onBack }) {
@@ -28,7 +30,6 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
   function handleReturnToTerms() {
     setActiveTab('terms');
     setActiveTerm(null);
-    // Scroll to the term after tab switch renders
     if (returnToTermId) {
       setTimeout(() => {
         const el = document.getElementById(`term-${returnToTermId}`);
@@ -76,6 +77,9 @@ export default function SectionPage({ sectionId, sectionName, courseId, onBack }
       )}
       {activeTab === 'notes' && (
         <NotesTab sectionId={sectionId} />
+      )}
+      {activeTab === 'ask' && (
+        <ChatTab courseId={courseId} />
       )}
     </div>
   );

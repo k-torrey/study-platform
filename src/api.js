@@ -693,3 +693,19 @@ export async function deleteSectionLink(id) {
     await supabase.from('section_textbook_links').delete().eq('id', id)
   );
 }
+
+// ─── Chat ───────────────────────────────────────────────────
+
+export async function askChatbot(question, courseId, history = []) {
+  const res = await fetch('/api/chat/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, courseId, history }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed' }));
+    throw new Error(err.error || 'Chat request failed');
+  }
+  return res.json();
+}
