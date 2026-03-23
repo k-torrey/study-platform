@@ -64,6 +64,7 @@ export default async function handler(req, res) {
               chapter_number: r.chapter_number,
               title: r.chapter_title,
               similarity: r.similarity,
+              passage: r.content,
             });
           }
         }
@@ -111,6 +112,7 @@ export default async function handler(req, res) {
                   chapter_number: r.chapter_number,
                   title: r.title,
                   similarity: 0,
+                  passage: excerpt,
                 });
               }
             }

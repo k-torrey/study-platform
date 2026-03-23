@@ -142,10 +142,30 @@ export default function ChatTab({ courseId }) {
     }
   }
 
-  async function openReader(chapterId, searchTerm) {
+  // Extract a unique phrase from a passage to use as highlight anchor
+  function getAnchorPhrase(passage) {
+    if (!passage) return '';
+    // Split into sentences, find one that's 40-150 chars (distinctive enough)
+    const sentences = passage.split(/(?<=[.!])\s+/).filter(s => s.length > 30 && s.length < 200);
+    if (sentences.length > 0) {
+      // Pick the first substantial sentence — extract 6-10 words from the middle
+      const sent = sentences[0];
+      const words = sent.split(/\s+/);
+      const start = Math.max(0, Math.floor(words.length * 0.2));
+      const phrase = words.slice(start, start + 8).join(' ');
+      return phrase;
+    }
+    // Fallback: take a chunk from the middle of the passage
+    const mid = Math.floor(passage.length * 0.3);
+    return passage.slice(mid, mid + 60).trim();
+  }
+
+  async function openReader(chapterId, searchTerm, passage) {
     setReaderLoading(true);
     setReaderOpen(true);
-    setReaderSearchTerm(searchTerm || '');
+    // Use a distinctive phrase from the passage to anchor the highlight
+    const anchor = passage ? getAnchorPhrase(passage) : searchTerm;
+    setReaderSearchTerm(anchor || searchTerm || '');
     try {
       const chapter = await getChapterContent(chapterId);
       setReaderChapter(chapter);
@@ -190,7 +210,8 @@ export default function ChatTab({ courseId }) {
                   onCiteClick={(num) => {
                     const srcs = sourcesMap[i];
                     if (srcs && srcs[num - 1]) {
-                      openReader(srcs[num - 1].chapter_id, getQuestionForMsg(i));
+                      const src = srcs[num - 1];
+                      openReader(src.chapter_id, getQuestionForMsg(i), src.passage);
                     }
                   }}
                 />
@@ -200,7 +221,7 @@ export default function ChatTab({ courseId }) {
                       <button
                         key={j}
                         className="btn btn-sm chat-source-btn"
-                        onClick={() => openReader(s.chapter_id, getQuestionForMsg(i))}
+                        onClick={() => openReader(s.chapter_id, getQuestionForMsg(i), s.passage)}
                       >
                         [{j + 1}] Ch. {s.chapter_number}: {s.title}
                       </button>
